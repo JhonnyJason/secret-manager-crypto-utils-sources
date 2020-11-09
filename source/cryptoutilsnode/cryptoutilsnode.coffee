@@ -1,4 +1,4 @@
-node = {}
+cryptoutilsnode = {}
 
 ############################################################
 noble = require("noble-ed25519")
@@ -36,26 +36,26 @@ sha512 = (content) ->
 
 ############################################################
 #region shas
-node.sha256Hex = (content) -> tbut.bytesToHex(sha256(content))
+cryptoutilsnode.sha256Hex = (content) -> tbut.bytesToHex(sha256(content))
 
-node.sha512Hex = (content) -> tbut.bytesToHex(sha512(content))
+cryptoutilsnode.sha512Hex = (content) -> tbut.bytesToHex(sha512(content))
 
 ############################################################
-node.sha256Bytes = sha256
+cryptoutilsnode.sha256Bytes = sha256
 
-node.sha512Bytes = sha512
+cryptoutilsnode.sha512Bytes = sha512
 
 #endregion
 
 ############################################################
 #region salts
-node.createRandomLengthSalt = ->
+cryptoutilsnode.createRandomLengthSalt = ->
     loop
         bytes = crypto.randomBytes(512)
         for byte,i in bytes when byte == 0
             return bytes.slice(0,i+1).toString("utf8")        
 
-node.removeSalt = (content) ->
+cryptoutilsnode.removeSalt = (content) ->
     for char,i in content when char == "\0"
         return content.slice(i+1)
     throw new Error("No Salt termination found!")    
@@ -64,7 +64,7 @@ node.removeSalt = (content) ->
 
 ############################################################
 #region encryption
-node.asymetricEncrypt = (content, publicKeyHex) ->
+cryptoutilsnode.asymetricEncrypt = (content, publicKeyHex) ->
     # a = Private Key
     # k = sha512(a) -> hashToScalar
     # G = basePoint
@@ -102,7 +102,7 @@ node.asymetricEncrypt = (content, publicKeyHex) ->
 
     return {referencePoint, encryptedContent}
 
-node.asymetricDecrypt = (secrets, privateKeyHex) ->
+cryptoutilsnode.asymetricDecrypt = (secrets, privateKeyHex) ->
     if !secrets.referencePoint? or !secrets.encryptedContent?
         throw new Error("unexpected secrets format!")
     # a = Private Key
@@ -128,7 +128,7 @@ node.asymetricDecrypt = (secrets, privateKeyHex) ->
     return content
 
 ############################################################
-node.symetricEncryptHex = (content, keyHex) ->
+cryptoutilsnode.symetricEncryptHex = (content, keyHex) ->
     ivHex = keyHex.substring(0, 32)
     ivBuffer = Buffer.from(ivHex, "hex")
     aesKeyHex = keyHex.substring(32,96)
@@ -145,7 +145,7 @@ node.symetricEncryptHex = (content, keyHex) ->
     gibbrish += cipher.final('hex')
     return gibbrish
 
-node.symetricDecryptHex = (gibbrishHex, keyHex) ->
+cryptoutilsnode.symetricDecryptHex = (gibbrishHex, keyHex) ->
     ivHex = keyHex.substring(0, 32)
     ivBuffer = Buffer.from(ivHex, "hex")
     aesKeyHex = keyHex.substring(32,96)
@@ -166,11 +166,11 @@ node.symetricDecryptHex = (gibbrishHex, keyHex) ->
 
 ############################################################
 #region signatures
-node.createSignature = (content, signingKeyHex) ->
+cryptoutilsnode.createSignature = (content, signingKeyHex) ->
     hashHex = @sha256Hex(content)
     return await noble.sign(hashHex, signingKeyHex)
 
-node.verify = (sigHex, keyHex, content) ->
+cryptoutilsnode.verify = (sigHex, keyHex, content) ->
     hashHex = @sha256Hex(content)
     return await noble.verify(sigHex, hashHex, keyHex)
 
@@ -178,4 +178,4 @@ node.verify = (sigHex, keyHex, content) ->
 
 #endregion
 
-module.exports = node
+module.exports = cryptoutilsnode

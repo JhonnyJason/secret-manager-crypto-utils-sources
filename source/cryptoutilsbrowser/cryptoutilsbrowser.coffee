@@ -139,8 +139,8 @@ cryptoutilsbrowser.symetricEncryptHex = (content, keyHex) ->
     ivHex = keyHex.substring(0, 32)
     aesKeyHex = keyHex.substring(32,96)
 
-    ivBuffer = utl.hexToBytes(ivHex)
-    contentBuffer = utl.utf8ToBuffer(content)
+    ivBuffer = tbut.hexToBytes(ivHex)
+    contentBuffer = tbut.utf8ToBuffer(content)
 
     key = await createKeyObject(aesKeyHex)
     algorithm = 
