@@ -1,3 +1,8 @@
 Object.defineProperty(exports, "__esModule", { value: true })
 
-exports.helloWorld = -> console.log("Hello World!")
+if typeof window == "object"
+    browser = require("./browser")
+    Object.assign(exports, browser)
+else
+    node = require("./node")
+    Object.assign(exports, node)

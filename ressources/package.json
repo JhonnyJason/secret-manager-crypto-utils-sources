@@ -1,12 +1,12 @@
 {
-  "name": "temporaryFiles",
+  "name": "secret-manager-crypto-utils",
   "version": "0.0.1",
   "description": "",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": ["ed25519", "asymmetric encryption", "symetric encryption", "crypto", "secret-manager", "utils"],
   "author": "Lenard Frommelt lenard.frommelt@gne.or.at",
   "license": "Unlicense",
   "bin": {
@@ -14,11 +14,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://.git"
+    "url": "git+https://github.com/JhonnyJason/secret-manager-crypto-utils-output.git"
   },
   "bugs": {
-    "url": "https://"
+    "url": "https://github.com/JhonnyJason/secret-manager-crypto-utils-output/issues"
   },
-  "homepage": "https://",
-  "dependencies": {}
+  "homepage": "https://github.com/JhonnyJason/secret-manager-crypto-utils-output#readme",
+  "dependencies": {
+    "noble-ed25519": "^1.0.2",
+    "thingy-byte-utils": "0.0.3"
+  }
 }
