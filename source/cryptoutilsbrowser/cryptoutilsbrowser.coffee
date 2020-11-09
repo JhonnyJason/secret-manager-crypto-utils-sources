@@ -1,4 +1,4 @@
-browser = {}
+cryptoutilsbrowser = {}
 
 ############################################################
 noble = require("noble-ed25519")
@@ -27,25 +27,25 @@ createKeyObject = (keyHex) ->
 
 ############################################################
 #region shas
-browser.sha256Hex = (content) ->
+cryptoutilsbrowser.sha256Hex = (content) ->
     if (typeof content) == "string" then contentBytes = tbut.utf8ToBytes(content)
     else contentBytes = content
     hashBytes = await crypto.digest("SHA-256", contentBytes)
     return tbut.bytesToHex(hashBytes)
 
-browser.sha512Hex = (content) ->
+cryptoutilsbrowser.sha512Hex = (content) ->
     if (typeof content) == "string" then contentBytes = tbut.utf8ToBytes(content)
     else contentBytes = content
     hashBytes = await crypto.digest("SHA-512", contentBytes)
     return tbut.bytesToHex(hashBytes)
 
 ############################################################
-browser.sha256Bytes = (content) ->
+cryptoutilsbrowser.sha256Bytes = (content) ->
     if (typeof content) == "string" then contentBytes = tbut.utf8ToBytes(content)
     else contentBytes = content
     return await crypto.digest("SHA-256", contentBytes)
 
-browser.sha512Bytes = (content) ->
+cryptoutilsbrowser.sha512Bytes = (content) ->
     if (typeof content) == "string" then contentBytes = tbut.utf8ToBytes(content)
     else contentBytes = content
     return await crypto.digest("SHA-512", contentBytes)
@@ -54,14 +54,14 @@ browser.sha512Bytes = (content) ->
 
 ############################################################
 #region salts
-browser.createRandomLengthSalt = ->
+cryptoutilsbrowser.createRandomLengthSalt = ->
     bytes = new Uint8Array(512)
     loop
         window.crypto.getRandomValues(bytes)
         for byte,i in bytes when byte == 0
             return tbut.bufferToUtf8(bytes.slice(0,i+1))        
 
-browser.removeSalt = (content) ->
+cryptoutilsbrowser.removeSalt = (content) ->
     for char,i in content when char == "\0"
         return content.slice(i+1)
     throw new Error("No Salt termination found!")    
@@ -70,7 +70,7 @@ browser.removeSalt = (content) ->
 
 ############################################################
 #region encryption
-browser.asymetricEncrypt = (content, publicKeyHex) ->
+cryptoutilsbrowser.asymetricEncrypt = (content, publicKeyHex) ->
     # a = Private Key
     # k = @sha512Bytes(a) -> hashToScalar
     # G = basePoint
@@ -101,14 +101,14 @@ browser.asymetricEncrypt = (content, publicKeyHex) ->
     
     ## TODO generate AES key
     symkeyHex = await @sha512Hex(lB.toHex())
-    gibbrish = await encryptionmodule.symetricEncryptHex(content, symkeyHex)
+    gibbrish = await @symetricEncryptHex(content, symkeyHex)
     
     referencePoint = AHex
     encryptedContent = gibbrish
 
     return {referencePoint, encryptedContent}
 
-browser.asymetricDecrypt = (secrets, privateKeyHex) ->
+cryptoutilsbrowser.asymetricDecrypt = (secrets, privateKeyHex) ->
     if !secrets.referencePoint? or !secrets.encryptedContent?
         throw new Error("unexpected secrets format!")
     # a = Private Key
@@ -135,7 +135,7 @@ browser.asymetricDecrypt = (secrets, privateKeyHex) ->
     return content
 
 ############################################################
-browser.symetricEncryptHex = (content, keyHex) ->
+cryptoutilsbrowser.symetricEncryptHex = (content, keyHex) ->
     ivHex = keyHex.substring(0, 32)
     aesKeyHex = keyHex.substring(32,96)
 
@@ -150,7 +150,7 @@ browser.symetricEncryptHex = (content, keyHex) ->
     gibbrishBuffer = await crypto.encrypt(algorithm, key, contentBuffer)
     return tbut.bytesToHex(gibbrishBuffer)
 
-browser.symetricDecryptHex = (gibbrishHex, keyHex) ->
+cryptoutilsbrowser.symetricDecryptHex = (gibbrishHex, keyHex) ->
     ivHex = keyHex.substring(0, 32)
     aesKeyHex = keyHex.substring(32,96)
     
@@ -169,11 +169,11 @@ browser.symetricDecryptHex = (gibbrishHex, keyHex) ->
 
 ############################################################
 #region signatures
-browser.createSignature = (content, signingKeyHex) ->
+cryptoutilsbrowser.createSignature = (content, signingKeyHex) ->
     hashHex = await @sha256Hex(content)
     return await noble.sign(hashHex, signingKeyHex)
 
-browser.verify = (sigHex, keyHex, content) ->
+cryptoutilsbrowser.verify = (sigHex, keyHex, content) ->
     hashHex = @sha256Hex(content)
     return await noble.verify(sigHex, hashHex, keyHex)
 
@@ -181,7 +181,7 @@ browser.verify = (sigHex, keyHex, content) ->
 
 #endregion
 
-module.exports = browser
+module.exports = cryptoutilsbrowser
 
 
 

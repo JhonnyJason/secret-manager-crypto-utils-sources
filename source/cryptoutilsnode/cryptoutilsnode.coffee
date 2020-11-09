@@ -124,7 +124,7 @@ node.asymetricDecrypt = (secrets, privateKeyHex) ->
     symkey = @sha512Hex(kA.toHex())
 
     gibbrishHex = secrets.encryptedContent
-    content = securityprimitives.symetricDecryptHex(gibbrishHex,symkey)
+    content = @symetricDecryptHex(gibbrishHex,symkey)
     return content
 
 ############################################################
