@@ -171,7 +171,7 @@ browser.symetricDecryptHex = (gibbrishHex, keyHex) ->
 #region signatures
 browser.createSignature = (content, signingKeyHex) ->
     hashHex = await @sha256Hex(content)
-    return await noble.sign(hashHex, secretKeyHex)
+    return await noble.sign(hashHex, signingKeyHex)
 
 browser.verify = (sigHex, keyHex, content) ->
     hashHex = @sha256Hex(content)

@@ -167,8 +167,8 @@ node.symetricDecryptHex = (gibbrishHex, keyHex) ->
 ############################################################
 #region signatures
 node.createSignature = (content, signingKeyHex) ->
-    hashHex = await @sha256Hex(content)
-    return await noble.sign(hashHex, secretKeyHex)
+    hashHex = @sha256Hex(content)
+    return await noble.sign(hashHex, signingKeyHex)
 
 node.verify = (sigHex, keyHex, content) ->
     hashHex = @sha256Hex(content)

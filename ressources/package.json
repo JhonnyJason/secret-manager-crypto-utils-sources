@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["ed25519", "asymmetric encryption", "symetric encryption", "crypto", "secret-manager", "utils"],
+  "keywords": ["ed25519", "asymetric-encryption", "symetric-encryption", "crypto", "secret-manager", "utility"],
   "author": "Lenard Frommelt lenard.frommelt@gne.or.at",
   "license": "Unlicense",
   "bin": {
