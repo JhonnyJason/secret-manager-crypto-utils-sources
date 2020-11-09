@@ -95,7 +95,7 @@ cryptoutilsnode.asymetricEncrypt = (content, publicKeyHex) ->
     
     symkey = @sha512Hex(lB.toHex())
     
-    gibbrish = securityprimitives.symetricEncryptHex(content, symkey)
+    gibbrish = @symetricEncryptHex(content, symkey)
     
     referencePoint = AHex
     encryptedContent = gibbrish
