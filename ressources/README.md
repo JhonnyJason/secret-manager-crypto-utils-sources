@@ -4,8 +4,8 @@
 For the specific usecases in the edeavour to get a reasonable [Secret Management](https://hackmd.io/PZjpRfzPSBCqS-8K54x2jA) we do not need too many features such that it made sense to specifically craft the small required functionality.
 
 # What?
-This is the collection of crypto primitives how it is directly used from other parts of the Secret Management.
-Carries functionality specific to NodeJs and modern Browsers which are available when bein used in the specific environment. -> requires native BigInt support!
+This is the collection of crypto primitives how it is directly used from other parts of the [Secret Management](https://hackmd.io/PZjpRfzPSBCqS-8K54x2jA?view).
+It uses functionality specific to NodeJs and modern Browsers which are available only then when being used in the specific environment. -> requires native BigInt support!
 
 The packages recognizes the environment through the availability of the `window` object.
 
@@ -22,25 +22,25 @@ secUtl.sha512Hex( String ) -> String
 secUtl.sha256Bytes( String ) -> ArrayBuffer | Buffer
 secUtl.sha512Bytes( String ) -> ArrayBuffer | Buffer
 
-##salts
+## salts
 secUtl.createRandomLengthSalt() -> String
 secUtl.removeSalt( String ) -> String
 
-##encryption - asymetric
+## encryption - asymetric
 secUtl.asymetricEncrypt( content, publicKey )
 secUtl.asymetricEncrypt( String, StringHex ) -> Object
 
 secUtl.asymetricDecrypt( secretsObject, privateKey )
 secUtl.asymetricDecrypt( Object, StringHex ) -> String
 
-##encryption - symetric
+## encryption - symetric
 secUtl.symetricEncryptHex( content, sharedKey )
 secUtl.symetricEncryptHex( String, StringHex ) -> StringHex
 
 secUtl.symetricDecrypttHex( encryptedContent, sharedKey )
 secUtl.symetricDecrypttHex( StringHex, StringHex ) -> String
 
-##signatures
+## signatures
 secUtl.createSignature( content, privateKey )
 secUtl.createSignature( String, StringHex ) -> StringHex
 
