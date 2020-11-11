@@ -1,0 +1,3 @@
+[submodule "source/cryptoutilsbrowser"]
+	path = source/cryptoutilsbrowser
+	url = git@github.com:JhonnyJason/secret-manager-crypto-utils-sources-cryptoutilsbrowser.git
