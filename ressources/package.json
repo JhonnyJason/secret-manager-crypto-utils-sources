@@ -1,6 +1,6 @@
 {
     "name": "secret-manager-crypto-utils",
-    "version": "0.0.8",
+    "version": "0.0.9",
     "description": "",
     "main": "index.js",
     "scripts": {
@@ -14,11 +14,8 @@
         "secret-manager",
         "utility"
     ],
-    "author": "Lenard Frommelt lenard.frommelt@gne.or.at",
+    "author": "Lenard Frommelt lenard@frommelt.dev",
     "license": "Unlicense",
-    "bin": {
-        "temporaryFiles": "./index.js"
-    },
     "repository": {
         "type": "git",
         "url": "git+https://github.com/JhonnyJason/secret-manager-crypto-utils-output.git"
