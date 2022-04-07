@@ -1,20 +1,26 @@
 # secret-manager-crypto-utils 
 
 ## Background
-For the specific usecases in the edeavor to get a reasonable [Secret Management](https://hackmd.io/PZjpRfzPSBCqS-8K54x2jA) we do not need too many features such that it made sense to specifically craft the small required functionality.
+For the specific usecases in the edeavor to get a reasonable [Secret Management](https://hackmd.io/PZjpRfzPSBCqS-8K54x2jA) we do not need too many features such that it made sense to specifically craft this small convenience library for the small required functionality.
 
-So this is the collection of crypto primitives how it is directly used from other parts of the [Secret Management](https://hackmd.io/PZjpRfzPSBCqS-8K54x2jA?view) system.
+This is:
 
-## How?
-It uses functionality specific to NodeJs and modern Browsers which are available only then when being used in the specific environment. -> requires native BigInt support!
+- sha256
+- sha512
+- Sign/Verify via Ed25519
+- Asymmetric Encrypt/Decrypt in ElGamal style using Curve25519
+- Symmetric Encrypt/Decrypt with AES-256-CBC
+- Random length salts to mitigate Known Plaintext Attacks
 
-The packages recognizes the environment through the availability of the `window` object.
+This is directly used from other parts of the [Secret Management](https://hackmd.io/PZjpRfzPSBCqS-8K54x2jA?view) system.
+
+## Usage
 
 Current Functionality
 ---------------------
 
 ```coffeescript
-secUtl = require("secret-manager-crypto-utils")
+import *  as secUtl from "secret-manager-crypto-utils"
 
 ## shas
 secUtl.sha256Hex( String ) -> String
@@ -23,9 +29,16 @@ secUtl.sha512Hex( String ) -> String
 secUtl.sha256Bytes( String ) -> ArrayBuffer | Buffer
 secUtl.sha512Bytes( String ) -> ArrayBuffer | Buffer
 
-## salts
-secUtl.createRandomLengthSalt() -> String
-secUtl.removeSalt( String ) -> String
+## keys
+secUtl.getNewKeyPair() -> Object { privateKeyHex, publicKeyHex }
+secUtl.getNewKeyPair() -> Object { StringHex, StringHex }
+
+## signatures
+secUtl.createSignature( content, privateKey )
+secUtl.createSignature( String, StringHex ) -> StringHex
+
+secUtl.verify( signature, publicKey, content )
+secUtl.verify(StringHex, StringHex, String) -> Boolean
 
 ## encryption - asymetric
 secUtl.asymetricEncrypt( content, publicKey )
@@ -41,12 +54,9 @@ secUtl.symetricEncryptHex( String, StringHex ) -> StringHex
 secUtl.symetricDecrypttHex( encryptedContent, sharedKey )
 secUtl.symetricDecrypttHex( StringHex, StringHex ) -> String
 
-## signatures
-secUtl.createSignature( content, privateKey )
-secUtl.createSignature( String, StringHex ) -> StringHex
-
-secUtl.verify( signature, publicKey, content )
-secUtl.verify(StringHex, StringHex, String) -> Boolean
+## salts
+secUtl.createRandomLengthSalt() -> String
+secUtl.removeSalt( String ) -> String
 
 ```
 

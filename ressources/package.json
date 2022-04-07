@@ -3,6 +3,7 @@
     "version": "0.0.10",
     "description": "",
     "main": "index.js",
+    "browser": "browser.js",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1"
     },
@@ -26,6 +27,7 @@
     "homepage": "https://github.com/JhonnyJason/secret-manager-crypto-utils-output#readme",
     "dependencies": {
         "@noble/ed25519": "^1.6.0",
-        "thingy-byte-utils": "0.0.4"
-    }
+        "thingy-byte-utils": "0.0.5"
+    },
+    "type": "module"
 }
