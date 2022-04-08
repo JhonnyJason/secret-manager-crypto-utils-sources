@@ -15,7 +15,6 @@ This is:
 This is directly used from other parts of the [Secret Management](https://hackmd.io/PZjpRfzPSBCqS-8K54x2jA?view) system.
 
 ## Usage
-
 Current Functionality
 ---------------------
 
@@ -23,36 +22,86 @@ Current Functionality
 import *  as secUtl from "secret-manager-crypto-utils"
 
 ## shas
-secUtl.sha256Hex( String ) -> String
-secUtl.sha512Hex( String ) -> String
+secUtl.sha256 = secUtl.sha256Hex 
+secUtl.sha256Hex( String ) -> StringHex
 
 secUtl.sha256Bytes( String ) -> ArrayBuffer | Buffer
+
+
+secUtl.sha512 = secUtl.sha512Hex
+secUtl.sha512Hex( String ) -> StringHex
+
 secUtl.sha512Bytes( String ) -> ArrayBuffer | Buffer
 
+
 ## keys
-secUtl.getNewKeyPair() -> Object { privateKeyHex, publicKeyHex }
-secUtl.getNewKeyPair() -> Object { StringHex, StringHex }
+secUtl.createKeyPair = secUtl.createKeyPairHex
+secUtl.createKeyPairHex() -> Object { privateKeyHex, publicKeyHex }
+secUtl.createKeyPairHex() -> Object { StringHex, StringHex }
+
+secUtl.createKeyPairBytes() -> Object { privateKeyBytes, publicKeyBytes }
+secUtl.createKeyPairBytes() -> Object { Uint8Array, Uint8Array }
+
+
+secUtl.createSymKey = secUtl.createSymKeyHex
+secUtl.createSymKeyHex() -> StringHex 
+
+secUtl.createSymKeyBytes() -> Uint8Array
+
 
 ## signatures
-secUtl.createSignature( content, privateKey )
-secUtl.createSignature( String, StringHex ) -> StringHex
+secUtl.createSignature = secUtl.createSignatureHex
+secUtl.createSignatureHex( content, privateKey )
+secUtl.createSignatureHex( String, StringHex ) -> StringHex
 
-secUtl.verify( signature, publicKey, content )
-secUtl.verify(StringHex, StringHex, String) -> Boolean
+secUtl.createSignatureBytes( content, privateKey )
+secUtl.createSignatureHex( String, Uint8Array ) -> Uint8Array
 
-## encryption - asymetric
-secUtl.asymetricEncrypt( content, publicKey )
-secUtl.asymetricEncrypt( String, StringHex ) -> Object
 
-secUtl.asymetricDecrypt( secretsObject, privateKey )
-secUtl.asymetricDecrypt( Object, StringHex ) -> String
+secUtl.verify = secUtl.verifyHex
+secUtl.verifyHex( signature, publicKey, content )
+secUtl.verifyHex(StringHex, StringHex, String) -> Boolean
+
+secUtl.verifyBytes( signature, publicKey, content )
+secUtl.verifyHex( Uint8Array, Uint8Array, String) -> Boolean
+
 
 ## encryption - symetric
-secUtl.symetricEncryptHex( content, sharedKey )
+secUtl.symetricEncrypt = secUtl.symetricEncryptHex
+secUtl.symetricEncryptHex( content, symKey )
 secUtl.symetricEncryptHex( String, StringHex ) -> StringHex
 
-secUtl.symetricDecrypttHex( encryptedContent, sharedKey )
-secUtl.symetricDecrypttHex( StringHex, StringHex ) -> String
+secUtl.symetricEncryptBytes( content, symKey )
+secUtl.symetricEncryptBytes( String, Uint8Array ) -> Uint8Array
+
+
+secUtl.symetricDecrypt = secUtl.symetricDecryptHex
+secUtl.symetricDecryptHex( encryptedContent, symKey )
+secUtl.symetricDecryptHex( StringHex, StringHex ) -> String
+
+secUtl.symetricDecryptBytes( encryptedContent, symKey )
+secUtl.symetricDecryptBytes( Uint8Array, Uint8Array ) -> String
+
+
+## encryption - asymetric
+secUtl.asymetricEncrypt = secUtl.asymetricEncryptHex
+secUtl.asymetricEncryptHex( content, publicKey )
+secUtl.asymetricEncryptHex( String, StringHex ) -> Object { referencePointHex, encryptetContentsHex }
+secUtl.asymetricEncryptHex( String, StringHex ) -> Object { StringHex, StringHex}
+
+secUtl.asymetricEncryptBytes( content, publicKey )
+secUtl.asymetricEncryptBytes( String, Uint8Array ) -> Object { referencePointBytes, encryptedContentsBytes }
+secUtl.asymetricEncryptBytes( String, Uint8Array ) -> Object { Uint8Array, Uint8Array }
+
+
+secUtl.asymetricDecrypt = secUtl.asymetricDecryptHex
+secUtl.asymetricDecryptHex( secretsObject, privateKey )
+secUtl.asymetricDecryptHex( Object { referencePointHex, encryptedContentsHex }, StringHex }, StringHex ) -> String
+secUtl.asymetricDecryptHex( Object { StringHex, StringHex }, StringHex }, StringHex ) -> String
+
+secUtl.asymetricDecryptBytes( secretsObject, privateKey )
+secUtl.asymetricDecryptBytes( Object { referencePointBytes, encryptedContentsBytes }, StringHex ) -> String
+secUtl.asymetricDecryptBytes( Object { Uint8Array, Uint8Array }, StringHex ) -> String
 
 ## salts
 secUtl.createRandomLengthSalt() -> String
@@ -65,10 +114,14 @@ For good reasons all encrypted contents, signatures and keys are stored in hex s
 
 The big wins of hex in readability and processability beats out the "downside" of being 2x the size.
 
-## Salts
-- The salt functionality is to create a random string of random length terminated by a `0` byte
-- The random length is limited to be at max 511bytes
-- The `removeSalt` would cut off all bytes until it reaches the first `0` byte
+### Performance is more important?
+Don't worry, we also have the versions using bytes, buffers, and specifically Uint8Arrays. To skip all the conversions back and forth. Use the Uint8Arrays in your code and use the byte-versions then.
+
+This is the reason why we have for each function the functionHex version and the functionBytes version.
+Because of reasons we assigned the standard function without the postfix to be the hex version.
+
+The reason is simply: The person who wants to skip the explicit version is more likely the be the one who needs the enhancanced readability later. ;-) 
+
 
 ## Encryption
 For the encryption functionality we use ed25519 keys for producing El-Gamal-style shared secret keys which we then use for symetrically encrypting the contents.
@@ -91,6 +144,11 @@ All of this is straight forward based on [noble-ed25519](https://github.com/paul
 All sorts of inputs are welcome, thanks!
 
 ---
+
+## Salts
+- The salt functionality is to create a random string of random length terminated by a `0` byte
+- The random length is limited to be at max 511bytes
+- The `removeSalt` would cut off all bytes until it reaches the first `0` byte
 
 # License
 

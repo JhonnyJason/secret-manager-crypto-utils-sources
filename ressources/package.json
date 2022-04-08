@@ -1,7 +1,7 @@
 {
     "name": "secret-manager-crypto-utils",
-    "version": "0.0.10",
-    "description": "",
+    "version": "0.1.0",
+    "description": "Small set of crypto utilities - ed25519 signatures and curve25519 el-gamal encrpytion.",
     "main": "index.js",
     "browser": "browser.js",
     "scripts": {
@@ -9,20 +9,26 @@
     },
     "keywords": [
         "ed25519",
+        "curve25519",
+        "encrpytion",
+        "signature",
+        "signing",
+        "verification",
         "asymetric-encryption",
         "symetric-encryption",
         "crypto",
         "secret-manager",
-        "utility"
+        "utility",
+        "el-gamal"
     ],
     "author": "Lenard Frommelt lenard@frommelt.dev",
     "license": "Unlicense",
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/JhonnyJason/secret-manager-crypto-utils-output.git"
+        "url": "git+https://github.com/JhonnyJason/secret-manager-crypto-utils.git"
     },
     "bugs": {
-        "url": "https://github.com/JhonnyJason/secret-manager-crypto-utils-output/issues"
+        "url": "https://github.com/JhonnyJason/secret-manager-crypto-utils/issues"
     },
     "homepage": "https://github.com/JhonnyJason/secret-manager-crypto-utils-output#readme",
     "dependencies": {
