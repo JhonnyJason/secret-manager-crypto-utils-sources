@@ -6,13 +6,22 @@ import crypto from "crypto"
 ############################################################
 algorithm = 'aes-256-cbc'
 
+ORDER = BigInt(2) ** BigInt(252) + BigInt('27742317777372353535851937790883648493')
+
 ############################################################
 hashToScalar = (hash) ->
     relevant = hash.slice(0, 32)
     relevant[0] &= 248
     relevant[31] &= 127
     relevant[31] |= 64
-    return tbut.bytesToBigInt(relevant)
+    bigInt = tbut.bytesToBigInt(relevant)
+    return mod(bigInt)
+
+mod = (a, b = ORDER) ->
+  result = a % b;
+  if result >= 0n then return result
+  else return result + b
+
 
 ############################################################
 #region exposedStuff
@@ -172,11 +181,12 @@ export symetricDecryptBytes = (gibbrishBytes, keyBytes) ->
 
 ############################################################
 # Hex Version
-export asymetricEncrypt = (content, publicKeyHex) ->
+export asymetricEncryptOld = (content, publicKeyHex) ->
     # a = Private Key
     # k = sha512(a) -> hashToScalar
     # G = basePoint
     # B = kG = Public Key
+    
     B = noble.Point.fromHex(publicKeyHex)
     BHex = publicKeyHex
     # log "BHex: " + BHex
@@ -194,25 +204,24 @@ export asymetricEncrypt = (content, publicKeyHex) ->
     nHex = tbut.bytesToHex(nBytes)
 
     lBigInt = hashToScalar(sha512Bytes(nBytes))
-    # log lBigInt
     
     #A one time public key = reference Point
-    AHex = await noble.getPublicKey(nHex)
-    
+    ABytes = await noble.getPublicKey(nHex)
     lB = await B.multiply(lBigInt)
     
-    symkey = @sha512Hex(lB.toHex())
+    symkey = sha512Hex(lB.toHex())
     
-    gibbrish = @symetricEncryptHex(content, symkey)
+    gibbrish = symetricEncryptHex(content, symkey)
     
-    referencePoint = AHex
-    encryptedContent = gibbrish
+    referencePointHex = tbut.bytesToHex(ABytes)
+    encryptedContentHex = gibbrish
 
-    return {referencePoint, encryptedContent}
+    return {referencePointHex, encryptedContentHex}
 
-export asymetricDecrypt = (secrets, privateKeyHex) ->
-    if !secrets.referencePoint? or !secrets.encryptedContent?
-        throw new Error("unexpected secrets format!")
+export asymetricDecryptOld = (secrets, privateKeyHex) ->
+    AHex = secrets.referencePointHex || secrets.referencePoint
+    gibbrishHex = secrets.encryptedContentHex || secrets.encryptedContent
+    if !AHex? or !gibbrishHex? then throw new Error("Invalid secrets Object!")
     # a = Private Key
     # k = sha512(a) -> hashToScalar
     # G = basePoint
@@ -225,14 +234,38 @@ export asymetricDecrypt = (secrets, privateKeyHex) ->
     # klG = lB = kA = shared secret
     # key = sha512(kAHex)
     # content = symetricDecrypt(X, key)
-    AHex = secrets.referencePoint
     A = noble.Point.fromHex(AHex)
     kA = await A.multiply(kBigInt)
     
-    symkey = @sha512Hex(kA.toHex())
+    symkey = sha512Hex(kA.toHex())
 
-    gibbrishHex = secrets.encryptedContent
-    content = @symetricDecryptHex(gibbrishHex,symkey)
+    content = symetricDecryptHex(gibbrishHex,symkey)
+    return content
+
+export asymetricEncrypt = (content, publicKeyHex) ->
+    nBytes = noble.utils.randomPrivateKey()
+    A = await noble.getPublicKey(nBytes)
+    lB = await noble.getSharedSecret(nBytes, publicKeyHex)
+
+    symkey = sha512Bytes(lB)
+    
+    gibbrish = symetricEncryptBytes(content, symkey)    
+    
+    referencePointHex = tbut.bytesToHex(A)
+    encryptedContentHex = tbut.bytesToHex(gibbrish)
+
+    return {referencePointHex, encryptedContentHex}
+
+export asymetricDecrypt = (secrets, privateKeyHex) ->
+    AHex = secrets.referencePointHex || secrets.referencePoint
+    gibbrishHex = secrets.encryptedContentHex || secrets.encryptedContent
+    if !AHex? or !gibbrishHex? then throw new Error("Invalid secrets Object!")
+
+    kA = await noble.getSharedSecret(privateKeyHex, AHex)
+    symkey = sha512Bytes(kA)
+
+    gibbrishBytes = tbut.hexToBytes(gibbrishHex)
+    content = symetricDecryptBytes(gibbrishBytes, symkey)
     return content
 
 export asymetricEncryptHex = asymetricEncrypt
@@ -240,66 +273,27 @@ export asymetricDecryptHex = asymetricDecrypt
 ############################################################
 # Byte Version
 export asymetricEncryptBytes = (content, publicKeyBytes) ->
-    # a = Private Key
-    # k = sha512(a) -> hashToScalar
-    # G = basePoint
-    # B = kG = Public Key
-    B = noble.Point.fromHex(publicKeyHex)
-    BHex = publicKeyHex
-    # log "BHex: " + BHex
-
-    # n = new one-time secret (generated on sever and forgotten about)
-    # l = sha512(n) -> hashToScalar
-    # lB = lkG = shared secret
-    # key = sha512(lBHex)
-    # X = symetricEncrypt(content, key)
-    # A = lG = one time public reference point
-    # {A,X} = data to be stored for B
-
-    # n = one-time secret
     nBytes = noble.utils.randomPrivateKey()
-    nHex = tbut.bytesToHex(nBytes)
+    ABytes = await noble.getPublicKey(nBytes)
+    lB = await noble.getSharedSecret(nBytes, publicKeyBytes)
 
-    lBigInt = hashToScalar(sha512Bytes(nBytes))
-    # log lBigInt
+    symkeyBytes = sha512Bytes(lB)
+    gibbrishBytes = symetricEncryptBytes(content, symkeyBytes)    
     
-    #A one time public key = reference Point
-    AHex = await noble.getPublicKey(nHex)
-    
-    lB = await B.multiply(lBigInt)
-    
-    symkey = @sha512Hex(lB.toHex())
-    
-    gibbrish = @symetricEncryptHex(content, symkey)
-    
-    referencePoint = AHex
-    encryptedContent = gibbrish
+    referencePointBytes = ABytes
+    encryptedContentBytes = gibbrishBytes
 
-    return {referencePoint, encryptedContent}
+    return {referencePointBytes, encryptedContentBytes}
 
 export asymetricDecryptBytes = (secrets, privateKeyBytes) ->
-    if !secrets.referencePoint? or !secrets.encryptedContent?
-        throw new Error("unexpected secrets format!")
-    # a = Private Key
-    # k = sha512(a) -> hashToScalar
-    # G = basePoint
-    # B = kG = Public Key
-    aBytes = tbut.hexToBytes(privateKeyHex)
-    kBigInt = hashToScalar(sha512Bytes(aBytes))
-    
-    # {A,X} = secrets
-    # A = lG = one time public reference point 
-    # klG = lB = kA = shared secret
-    # key = sha512(kAHex)
-    # content = symetricDecrypt(X, key)
-    AHex = secrets.referencePoint
-    A = noble.Point.fromHex(AHex)
-    kA = await A.multiply(kBigInt)
-    
-    symkey = @sha512Hex(kA.toHex())
+    ABytes = secrets.referencePointBytes || secrets.referencePoint
+    gibbrishBytes = secrets.encryptedContentBytes || secrets.encryptedContent
+    if !ABytes? or !gibbrishBytes? then throw new Error("Invalid secrets Object!")
 
-    gibbrishHex = secrets.encryptedContent
-    content = @symetricDecryptHex(gibbrishHex,symkey)
+    kABytes = await noble.getSharedSecret(privateKeyBytes, ABytes)
+    symkeyBytes = sha512Bytes(kABytes)
+
+    content = symetricDecryptBytes(gibbrishBytes, symkeyBytes)
     return content
 
 #endregion

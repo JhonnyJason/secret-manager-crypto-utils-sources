@@ -1,6 +1,0 @@
-[submodule "source/cryptoutilsbrowser"]
-	path = source/cryptoutilsbrowser
-	url = git@github.com:JhonnyJason/secret-manager-crypto-utils-sources-cryptoutilsbrowser.git
-[submodule "source/cryptoutilsnode"]
-	path = source/cryptoutilsnode
-	url = git@github.com:JhonnyJason/secret-manager-crypto-utils-sources-cryptoutilsnode.git
