@@ -66,42 +66,42 @@ secUtl.verifyBytes( signature, publicKey, content )
 secUtl.verifyHex( Uint8Array, Uint8Array, String) -> Boolean
 
 
-## encryption - symetric
-secUtl.symetricEncrypt = secUtl.symetricEncryptHex
-secUtl.symetricEncryptHex( content, symKey )
-secUtl.symetricEncryptHex( String, StringHex ) -> StringHex
+## encryption - symmetric
+secUtl.symmetricEncrypt = secUtl.symmetricEncryptHex
+secUtl.symmetricEncryptHex( content, symKey )
+secUtl.symmetricEncryptHex( String, StringHex ) -> StringHex
 
-secUtl.symetricEncryptBytes( content, symKey )
-secUtl.symetricEncryptBytes( String, Uint8Array ) -> Uint8Array
-
-
-secUtl.symetricDecrypt = secUtl.symetricDecryptHex
-secUtl.symetricDecryptHex( encryptedContent, symKey )
-secUtl.symetricDecryptHex( StringHex, StringHex ) -> String
-
-secUtl.symetricDecryptBytes( encryptedContent, symKey )
-secUtl.symetricDecryptBytes( Uint8Array, Uint8Array ) -> String
+secUtl.symmetricEncryptBytes( content, symKey )
+secUtl.symmetricEncryptBytes( String, Uint8Array ) -> Uint8Array
 
 
-## encryption - asymetric
-secUtl.asymetricEncrypt = secUtl.asymetricEncryptHex
-secUtl.asymetricEncryptHex( content, publicKey )
-secUtl.asymetricEncryptHex( String, StringHex ) -> Object { referencePointHex, encryptetContentsHex }
-secUtl.asymetricEncryptHex( String, StringHex ) -> Object { StringHex, StringHex}
+secUtl.symmetricDecrypt = secUtl.symmetricDecryptHex
+secUtl.symmetricDecryptHex( encryptedContent, symKey )
+secUtl.symmetricDecryptHex( StringHex, StringHex ) -> String
 
-secUtl.asymetricEncryptBytes( content, publicKey )
-secUtl.asymetricEncryptBytes( String, Uint8Array ) -> Object { referencePointBytes, encryptedContentsBytes }
-secUtl.asymetricEncryptBytes( String, Uint8Array ) -> Object { Uint8Array, Uint8Array }
+secUtl.symmetricDecryptBytes( encryptedContent, symKey )
+secUtl.symmetricDecryptBytes( Uint8Array, Uint8Array ) -> String
 
 
-secUtl.asymetricDecrypt = secUtl.asymetricDecryptHex
-secUtl.asymetricDecryptHex( secretsObject, privateKey )
-secUtl.asymetricDecryptHex( Object { referencePointHex, encryptedContentsHex }, StringHex }, StringHex ) -> String
-secUtl.asymetricDecryptHex( Object { StringHex, StringHex }, StringHex }, StringHex ) -> String
+## encryption - asymmetric
+secUtl.asymmetricEncrypt = secUtl.asymmetricEncryptHex
+secUtl.asymmetricEncryptHex( content, publicKey )
+secUtl.asymmetricEncryptHex( String, StringHex ) -> Object { referencePointHex, encryptetContentsHex }
+secUtl.asymmetricEncryptHex( String, StringHex ) -> Object { StringHex, StringHex}
 
-secUtl.asymetricDecryptBytes( secretsObject, privateKey )
-secUtl.asymetricDecryptBytes( Object { referencePointBytes, encryptedContentsBytes }, StringHex ) -> String
-secUtl.asymetricDecryptBytes( Object { Uint8Array, Uint8Array }, StringHex ) -> String
+secUtl.asymmetricEncryptBytes( content, publicKey )
+secUtl.asymmetricEncryptBytes( String, Uint8Array ) -> Object { referencePointBytes, encryptedContentsBytes }
+secUtl.asymmetricEncryptBytes( String, Uint8Array ) -> Object { Uint8Array, Uint8Array }
+
+
+secUtl.asymmetricDecrypt = secUtl.asymmetricDecryptHex
+secUtl.asymmetricDecryptHex( secretsObject, privateKey )
+secUtl.asymmetricDecryptHex( Object { referencePointHex, encryptedContentsHex }, StringHex }, StringHex ) -> String
+secUtl.asymmetricDecryptHex( Object { StringHex, StringHex }, StringHex }, StringHex ) -> String
+
+secUtl.asymmetricDecryptBytes( secretsObject, privateKey )
+secUtl.asymmetricDecryptBytes( Object { referencePointBytes, encryptedContentsBytes }, StringHex ) -> String
+secUtl.asymmetricDecryptBytes( Object { Uint8Array, Uint8Array }, StringHex ) -> String
 
 ## salts
 secUtl.createRandomLengthSalt() -> String
@@ -124,7 +124,7 @@ The reason is simply: The person who wants to skip the explicit version is more 
 
 
 ## Encryption
-For the encryption functionality we use ed25519 keys for producing El-Gamal-style shared secret keys which we then use for symetrically encrypting the contents.
+For the encryption functionality we use ed25519 keys for producing El-Gamal-style shared secret keys which we then use for symmetrically encrypting the contents.
 
 The result of this kind of encryption is always an Object like:
 ```json
@@ -134,7 +134,7 @@ The result of this kind of encryption is always an Object like:
 }
 ```
 
-The symetric encryption uses `aes-256-cbc`.
+The symmetric encryption uses `aes-256-cbc`.
 
 ## Noble ed25519
 All of this is straight forward based on [noble-ed25519](https://github.com/paulmillr/noble-ed25519). A very concise and modern package for freely using the ed25519 algorithms. Big thanks for that!

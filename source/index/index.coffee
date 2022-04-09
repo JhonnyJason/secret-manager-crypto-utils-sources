@@ -111,11 +111,11 @@ export verifyBytes = (sigBytes, keyBytes, content) ->
 #endregion
 
 ############################################################
-#region symetric encryption
+#region symmetric encryption
 
 ############################################################
 # Hex Version
-export symetricEncrypt = (content, keyHex) ->
+export symmetricEncrypt = (content, keyHex) ->
     ivHex = keyHex.substring(0, 32)
     ivBuffer = Buffer.from(ivHex, "hex")
     aesKeyHex = keyHex.substring(32,96)
@@ -132,7 +132,7 @@ export symetricEncrypt = (content, keyHex) ->
     gibbrish += cipher.final('hex')
     return gibbrish
 
-export symetricDecrypt = (gibbrishHex, keyHex) ->
+export symmetricDecrypt = (gibbrishHex, keyHex) ->
     ivHex = keyHex.substring(0, 32)
     ivBuffer = Buffer.from(ivHex, "hex")
     aesKeyHex = keyHex.substring(32,96)
@@ -149,11 +149,11 @@ export symetricDecrypt = (gibbrishHex, keyHex) ->
     content += decipher.final('utf8')
     return content
 
-export symetricEncryptHex = symetricEncrypt
-export symetricDecryptHex = symetricDecrypt
+export symmetricEncryptHex = symmetricEncrypt
+export symmetricDecryptHex = symmetricDecrypt
 ############################################################
 # Byte Version
-export symetricEncryptBytes = (content, keyBytes) ->
+export symmetricEncryptBytes = (content, keyBytes) ->
     ivBuffer = Buffer.from(keyBytes.buffer, 0, 16)
     aesKeyBuffer = Buffer.from(keyBytes.buffer, 16, 32)
     
@@ -163,7 +163,7 @@ export symetricEncryptBytes = (content, keyBytes) ->
     allGibbrish = Buffer.concat([gibbrish,gibbrishFinal])
     return new Uint8Array(allGibbrish)
 
-export symetricDecryptBytes = (gibbrishBytes, keyBytes) ->
+export symmetricDecryptBytes = (gibbrishBytes, keyBytes) ->
     ivBuffer = Buffer.from(keyBytes.buffer, 0, 16)
     aesKeyBuffer = Buffer.from(keyBytes.buffer, 16, 32)
     # gibbrishBuffer = Buffer.from(gibbrishBytes)
@@ -177,11 +177,11 @@ export symetricDecryptBytes = (gibbrishBytes, keyBytes) ->
 #endregion
 
 ############################################################
-#region asymetric encryption
+#region asymmetric encryption
 
 ############################################################
 # Hex Version
-export asymetricEncryptOld = (content, publicKeyHex) ->
+export asymmetricEncryptOld = (content, publicKeyHex) ->
     # a = Private Key
     # k = sha512(a) -> hashToScalar
     # G = basePoint
@@ -195,7 +195,7 @@ export asymetricEncryptOld = (content, publicKeyHex) ->
     # l = sha512(n) -> hashToScalar
     # lB = lkG = shared secret
     # key = sha512(lBHex)
-    # X = symetricEncrypt(content, key)
+    # X = symmetricEncrypt(content, key)
     # A = lG = one time public reference point
     # {A,X} = data to be stored for B
 
@@ -211,14 +211,14 @@ export asymetricEncryptOld = (content, publicKeyHex) ->
     
     symkey = sha512Hex(lB.toHex())
     
-    gibbrish = symetricEncryptHex(content, symkey)
+    gibbrish = symmetricEncryptHex(content, symkey)
     
     referencePointHex = tbut.bytesToHex(ABytes)
     encryptedContentHex = gibbrish
 
     return {referencePointHex, encryptedContentHex}
 
-export asymetricDecryptOld = (secrets, privateKeyHex) ->
+export asymmetricDecryptOld = (secrets, privateKeyHex) ->
     AHex = secrets.referencePointHex || secrets.referencePoint
     gibbrishHex = secrets.encryptedContentHex || secrets.encryptedContent
     if !AHex? or !gibbrishHex? then throw new Error("Invalid secrets Object!")
@@ -233,59 +233,61 @@ export asymetricDecryptOld = (secrets, privateKeyHex) ->
     # A = lG = one time public reference point 
     # klG = lB = kA = shared secret
     # key = sha512(kAHex)
-    # content = symetricDecrypt(X, key)
+    # content = symmetricDecrypt(X, key)
     A = noble.Point.fromHex(AHex)
     kA = await A.multiply(kBigInt)
     
     symkey = sha512Hex(kA.toHex())
 
-    content = symetricDecryptHex(gibbrishHex,symkey)
+    content = symmetricDecryptHex(gibbrishHex,symkey)
     return content
 
-export asymetricEncrypt = (content, publicKeyHex) ->
+export asymmetricEncrypt = (content, publicKeyHex) ->
     nBytes = noble.utils.randomPrivateKey()
     A = await noble.getPublicKey(nBytes)
     lB = await noble.getSharedSecret(nBytes, publicKeyHex)
 
     symkey = sha512Bytes(lB)
+    # symkey = sha512Bytes(tbut.bytesToHex(lB))
     
-    gibbrish = symetricEncryptBytes(content, symkey)    
+    gibbrish = symmetricEncryptBytes(content, symkey)    
     
     referencePointHex = tbut.bytesToHex(A)
     encryptedContentHex = tbut.bytesToHex(gibbrish)
 
     return {referencePointHex, encryptedContentHex}
 
-export asymetricDecrypt = (secrets, privateKeyHex) ->
+export asymmetricDecrypt = (secrets, privateKeyHex) ->
     AHex = secrets.referencePointHex || secrets.referencePoint
     gibbrishHex = secrets.encryptedContentHex || secrets.encryptedContent
     if !AHex? or !gibbrishHex? then throw new Error("Invalid secrets Object!")
 
     kA = await noble.getSharedSecret(privateKeyHex, AHex)
     symkey = sha512Bytes(kA)
+    # symkey = sha512Bytes(tbut.bytesToHex(kA))
 
     gibbrishBytes = tbut.hexToBytes(gibbrishHex)
-    content = symetricDecryptBytes(gibbrishBytes, symkey)
+    content = symmetricDecryptBytes(gibbrishBytes, symkey)
     return content
 
-export asymetricEncryptHex = asymetricEncrypt
-export asymetricDecryptHex = asymetricDecrypt
+export asymmetricEncryptHex = asymmetricEncrypt
+export asymmetricDecryptHex = asymmetricDecrypt
 ############################################################
 # Byte Version
-export asymetricEncryptBytes = (content, publicKeyBytes) ->
+export asymmetricEncryptBytes = (content, publicKeyBytes) ->
     nBytes = noble.utils.randomPrivateKey()
     ABytes = await noble.getPublicKey(nBytes)
     lB = await noble.getSharedSecret(nBytes, publicKeyBytes)
 
     symkeyBytes = sha512Bytes(lB)
-    gibbrishBytes = symetricEncryptBytes(content, symkeyBytes)    
+    gibbrishBytes = symmetricEncryptBytes(content, symkeyBytes)    
     
     referencePointBytes = ABytes
     encryptedContentBytes = gibbrishBytes
 
     return {referencePointBytes, encryptedContentBytes}
 
-export asymetricDecryptBytes = (secrets, privateKeyBytes) ->
+export asymmetricDecryptBytes = (secrets, privateKeyBytes) ->
     ABytes = secrets.referencePointBytes || secrets.referencePoint
     gibbrishBytes = secrets.encryptedContentBytes || secrets.encryptedContent
     if !ABytes? or !gibbrishBytes? then throw new Error("Invalid secrets Object!")
@@ -293,7 +295,7 @@ export asymetricDecryptBytes = (secrets, privateKeyBytes) ->
     kABytes = await noble.getSharedSecret(privateKeyBytes, ABytes)
     symkeyBytes = sha512Bytes(kABytes)
 
-    content = symetricDecryptBytes(gibbrishBytes, symkeyBytes)
+    content = symmetricDecryptBytes(gibbrishBytes, symkeyBytes)
     return content
 
 #endregion
