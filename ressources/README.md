@@ -110,7 +110,8 @@ secUtl.removeSalt( String ) -> String
 ```
 
 ## Breaking Updates
-From `0.0.x` -> `0.1.0`
+`0.0.x` -> `0.1.0`
+------------------
 
 ### API Changes
 The API has changed as spelling mistake has been corrected:
