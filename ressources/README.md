@@ -109,18 +109,34 @@ secUtl.removeSalt( String ) -> String
 
 ```
 
+## Breaking Updates
+From `0.0.x` -> `0.1.0`
+
+### API Changes
+The API has changed as spelling mistake has been corrected:
+- symetric -> symmetric
+- asymetric -> asymmetric
+
+### Incompatibility
+Also the asymmetric encryption algorithm has slightly changed, specifically just how the shared secret is calculated. The result is that secrets being encrypted with the old version are not decryptable with the newer version and vice-versa.
+
+To combat this we have included the old style functions as well, which only exist in the hex version:
+- asymmetricEncryptOld(content, publicKeyHex)
+- asymmetricDecryptOld(secrets, privateKeyHex)
+
+
 ## Hex FTW
 For good reasons all encrypted contents, signatures and keys are stored in hex strings. This appears to be the most superior way of how to universally transfer byte information.
 
 The big wins of hex in readability and processability beats out the "downside" of being 2x the size.
 
-### Performance is more important?
-Don't worry, we also have the versions using bytes, buffers, and specifically Uint8Arrays. To skip all the conversions back and forth. Use the Uint8Arrays in your code and use the byte-versions then.
+## Performance is more important?
+We also have the versions using bytes, buffers, and specifically Uint8Arrays. To skip all the conversions back and forth. Use the Uint8Arrays in your code and use the byte-versions then.
 
-This is the reason why we have for each function the functionHex version and the functionBytes version.
-Because of reasons we assigned the standard function without the postfix to be the hex version.
+We have for each function the `functionHex` version and the `functionBytes` version.
+Because of reasons we assigned the standard `function` without the postfix to be the hex version.
 
-The reason is simply: The person who wants to skip the explicit version is more likely the be the one who needs the enhancanced readability later. ;-) 
+*The reason is simply: The person who wants to skip the explicit version is more likely the be the one who needs the enhancanced readability later. ;-)*
 
 
 ## Encryption
@@ -136,6 +152,8 @@ The result of this kind of encryption is always an Object like:
 
 The symmetric encryption uses `aes-256-cbc`.
 
+*Notice: it is your responsibility to salt your contents to be encrypted.*
+
 ## Noble ed25519
 All of this is straight forward based on [noble-ed25519](https://github.com/paulmillr/noble-ed25519). A very concise and modern package for freely using the ed25519 algorithms. Big thanks for that!
 
@@ -149,6 +167,7 @@ All sorts of inputs are welcome, thanks!
 - The salt functionality is to create a random string of random length terminated by a `0` byte
 - The random length is limited to be at max 511bytes
 - The `removeSalt` would cut off all bytes until it reaches the first `0` byte
+- Using AES-256-CBC in combination with this random length salt prefix effectivly eliminates the known plaintext attack surface.
 
 # License
 
