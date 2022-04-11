@@ -22,20 +22,20 @@ Current Functionality
 import *  as secUtl from "secret-manager-crypto-utils"
 
 ## shas
-secUtl.sha256 = secUtl.sha256Hex 
+# secUtl.sha256 is secUtl.sha256Hex 
 secUtl.sha256Hex( String ) -> StringHex
 
-secUtl.sha256Bytes( String ) -> ArrayBuffer | Buffer
+secUtl.sha256Bytes( String ) -> Uint8Array | Buffer
 
 
-secUtl.sha512 = secUtl.sha512Hex
+# secUtl.sha512 is secUtl.sha512Hex
 secUtl.sha512Hex( String ) -> StringHex
 
-secUtl.sha512Bytes( String ) -> ArrayBuffer | Buffer
+secUtl.sha512Bytes( String ) -> Uint8Array | Buffer
 
 
 ## keys
-secUtl.createKeyPair = secUtl.createKeyPairHex
+# secUtl.createKeyPair is secUtl.createKeyPairHex
 secUtl.createKeyPairHex() -> Object { privateKeyHex, publicKeyHex }
 secUtl.createKeyPairHex() -> Object { StringHex, StringHex }
 
@@ -50,7 +50,7 @@ secUtl.createSymKeyBytes() -> Uint8Array
 
 
 ## signatures
-secUtl.createSignature = secUtl.createSignatureHex
+# secUtl.createSignature is secUtl.createSignatureHex
 secUtl.createSignatureHex( content, privateKey )
 secUtl.createSignatureHex( String, StringHex ) -> StringHex
 
@@ -58,7 +58,7 @@ secUtl.createSignatureBytes( content, privateKey )
 secUtl.createSignatureHex( String, Uint8Array ) -> Uint8Array
 
 
-secUtl.verify = secUtl.verifyHex
+# secUtl.verify is secUtl.verifyHex
 secUtl.verifyHex( signature, publicKey, content )
 secUtl.verifyHex(StringHex, StringHex, String) -> Boolean
 
@@ -67,7 +67,7 @@ secUtl.verifyHex( Uint8Array, Uint8Array, String) -> Boolean
 
 
 ## encryption - symmetric
-secUtl.symmetricEncrypt = secUtl.symmetricEncryptHex
+# secUtl.symmetricEncrypt is secUtl.symmetricEncryptHex
 secUtl.symmetricEncryptHex( content, symKey )
 secUtl.symmetricEncryptHex( String, StringHex ) -> StringHex
 
@@ -75,7 +75,7 @@ secUtl.symmetricEncryptBytes( content, symKey )
 secUtl.symmetricEncryptBytes( String, Uint8Array ) -> Uint8Array
 
 
-secUtl.symmetricDecrypt = secUtl.symmetricDecryptHex
+# secUtl.symmetricDecrypt is secUtl.symmetricDecryptHex
 secUtl.symmetricDecryptHex( encryptedContent, symKey )
 secUtl.symmetricDecryptHex( StringHex, StringHex ) -> String
 
@@ -84,7 +84,7 @@ secUtl.symmetricDecryptBytes( Uint8Array, Uint8Array ) -> String
 
 
 ## encryption - asymmetric
-secUtl.asymmetricEncrypt = secUtl.asymmetricEncryptHex
+# secUtl.asymmetricEncrypt is secUtl.asymmetricEncryptHex
 secUtl.asymmetricEncryptHex( content, publicKey )
 secUtl.asymmetricEncryptHex( String, StringHex ) -> Object { referencePointHex, encryptetContentsHex }
 secUtl.asymmetricEncryptHex( String, StringHex ) -> Object { StringHex, StringHex}
@@ -94,14 +94,14 @@ secUtl.asymmetricEncryptBytes( String, Uint8Array ) -> Object { referencePointBy
 secUtl.asymmetricEncryptBytes( String, Uint8Array ) -> Object { Uint8Array, Uint8Array }
 
 
-secUtl.asymmetricDecrypt = secUtl.asymmetricDecryptHex
+# secUtl.asymmetricDecrypt is secUtl.asymmetricDecryptHex
 secUtl.asymmetricDecryptHex( secretsObject, privateKey )
 secUtl.asymmetricDecryptHex( Object { referencePointHex, encryptedContentsHex }, StringHex }, StringHex ) -> String
 secUtl.asymmetricDecryptHex( Object { StringHex, StringHex }, StringHex }, StringHex ) -> String
 
 secUtl.asymmetricDecryptBytes( secretsObject, privateKey )
-secUtl.asymmetricDecryptBytes( Object { referencePointBytes, encryptedContentsBytes }, StringHex ) -> String
-secUtl.asymmetricDecryptBytes( Object { Uint8Array, Uint8Array }, StringHex ) -> String
+secUtl.asymmetricDecryptBytes( Object { referencePointBytes, encryptedContentsBytes }, Uint8Array ) -> String
+secUtl.asymmetricDecryptBytes( Object { Uint8Array, Uint8Array }, Uint8Array ) -> String
 
 ## salts
 secUtl.createRandomLengthSalt() -> String
@@ -119,17 +119,17 @@ The API has changed as spelling mistake has been corrected:
 - asymetric -> asymmetric
 
 ### Incompatibility
-Also the asymmetric encryption algorithm has slightly changed, specifically just how the shared secret is calculated. The result is that secrets being encrypted with the old version are not decryptable with the newer version and vice-versa.
+Also the asymmetric encryption algorithm has slightly changed, specifically how the shared secret is calculated. The result is that secrets being encrypted with the old version are not decryptable with the newer version and vice-versa.
 
-To combat this we have included the old style functions as well, which only exist in the hex version:
+For conversion purposes we have included the old style functions as well, which only exist in the hex version:
 - asymmetricEncryptOld(content, publicKeyHex)
 - asymmetricDecryptOld(secrets, privateKeyHex)
 
 
 ## Hex FTW
-For good reasons all encrypted contents, signatures and keys are stored in hex strings. This appears to be the most superior way of how to universally transfer byte information.
+It is adivsable  that you stare all encrypted contents, signatures and keys in hex strings. This appears to be the most superior way of how to universally transfer byte information.
 
-The big wins of hex in readability and processability beats out the "downside" of being 2x the size.
+The big wins of hex in readability and processability beats out the "downside" of being 2x the size. Also the performance loss is in most cases neglible ~ < 10%.
 
 ## Performance is more important?
 We also have the versions using bytes, buffers, and specifically Uint8Arrays. To skip all the conversions back and forth. Use the Uint8Arrays in your code and use the byte-versions then.
@@ -141,7 +141,7 @@ Because of reasons we assigned the standard `function` without the postfix to be
 
 
 ## Encryption
-For the encryption functionality we use ed25519 keys for producing El-Gamal-style shared secret keys which we then use for symmetrically encrypting the contents.
+For the encryption functionality we use ed25519 keys for producing El-Gamal-style shared secret-keys which we then use for symmetrically encrypting the contents.
 
 The result of this kind of encryption is always an Object like:
 ```json
