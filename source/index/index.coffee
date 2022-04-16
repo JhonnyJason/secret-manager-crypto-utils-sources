@@ -68,8 +68,13 @@ export createSymKey = ->
     keyAndIV = crypto.randomBytes(48)
     return tbut.bytesToHex(keyAndIV)
 
+export publicKey = (secretKey) ->
+    publicKey = await noble.getPublicKey(secretKey)
+    return tbut.bytesToHex(publicKey)
+
 export createKeyPairHex = createKeyPair
 export createSymKeyHex = createSymKey
+export publicKeyHex = publicKey
 
 ############################################################
 # Byte Version
@@ -79,6 +84,8 @@ export createKeyPairBytes =  ->
     return {secretKeyBytes, publicKeyBytes}
 
 export createSymKeyBytes = -> new Uint8Array((crypto.randomBytes(48)).buffer)
+
+export publicKeyBytes = (secretKey) -> await noble.getPublicKey(secretKeyBytes)
 
 #endregion
 

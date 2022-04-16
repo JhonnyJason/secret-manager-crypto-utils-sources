@@ -43,7 +43,15 @@ secUtl.createKeyPairBytes() -> Object { privateKeyBytes, publicKeyBytes }
 secUtl.createKeyPairBytes() -> Object { Uint8Array, Uint8Array }
 
 
-secUtl.createSymKey = secUtl.createSymKeyHex
+# secUtl.publicKey is secUtl.publicKeyHex
+secUtl.publicKeyHex( privateKeyHex ) -> publicKeyHex
+secUtl.publicKeyHex( StringHex ) -> StringHex
+
+secUtl.publicKeyBytes( privateKeyBytes ) -> publicKeyBytes
+secUtl.publicKeyBytes( Uint8Array ) -> Uint8Array
+
+
+#secUtl.createSymKey = secUtl.createSymKeyHex
 secUtl.createSymKeyHex() -> StringHex 
 
 secUtl.createSymKeyBytes() -> Uint8Array
@@ -110,7 +118,7 @@ secUtl.removeSalt( String ) -> String
 ```
 
 ## Breaking Updates
-`0.0.x` -> `0.1.0`
+`0.0.x` -> `0.1.y`
 ------------------
 
 ### API Changes
