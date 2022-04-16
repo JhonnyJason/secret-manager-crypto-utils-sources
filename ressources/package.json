@@ -1,6 +1,6 @@
 {
     "name": "secret-manager-crypto-utils",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "Small set of crypto utilities - ed25519 signatures and curve25519 el-gamal encrpytion.",
     "main": "index.js",
     "browser": "browser.js",

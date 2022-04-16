@@ -58,23 +58,23 @@ export sha512Bytes = (content) ->
 ############################################################
 # Hex Version
 export createKeyPair =  ->
-    secretKey = noble.utils.randomPrivateKey()
-    publicKey = await noble.getPublicKey(secretKey)
-    secretKeyHex = tbut.bytesToHex(secretKey)
-    publicKeyHex = tbut.bytesToHex(publicKey)
+    secretKeyBytes = noble.utils.randomPrivateKey()
+    publicKeyBytes = await noble.getPublicKey(secretKeyBytes)
+    secretKeyHex = tbut.bytesToHex(secretKeyBytes)
+    publicKeyHex = tbut.bytesToHex(publicKeyBytes)
     return {secretKeyHex, publicKeyHex}
 
 export createSymKey = ->
     keyAndIV = crypto.randomBytes(48)
     return tbut.bytesToHex(keyAndIV)
 
-export publicKey = (secretKey) ->
-    publicKey = await noble.getPublicKey(secretKey)
-    return tbut.bytesToHex(publicKey)
+export createPublicKey = (secretKeyHex) ->
+    publicKeyBytes = await noble.getPublicKey(secretKeyHex)
+    return tbut.bytesToHex(publicKeyBytes)
 
 export createKeyPairHex = createKeyPair
 export createSymKeyHex = createSymKey
-export publicKeyHex = publicKey
+export createPublicKeyHex = createPublicKey
 
 ############################################################
 # Byte Version
@@ -85,7 +85,7 @@ export createKeyPairBytes =  ->
 
 export createSymKeyBytes = -> new Uint8Array((crypto.randomBytes(48)).buffer)
 
-export publicKeyBytes = (secretKey) -> await noble.getPublicKey(secretKeyBytes)
+export createPublicKeyBytes = (secretKeyBytes) -> await noble.getPublicKey(secretKeyBytes)
 
 #endregion
 
@@ -189,7 +189,7 @@ export symmetricDecryptBytes = (gibbrishBytes, keyBytes) ->
 ############################################################
 # Hex Version
 export asymmetricEncryptOld = (content, publicKeyHex) ->
-    # a = Private Key
+    # a = Secret Key
     # k = sha512(a) -> hashToScalar
     # G = basePoint
     # B = kG = Public Key
@@ -225,15 +225,15 @@ export asymmetricEncryptOld = (content, publicKeyHex) ->
 
     return {referencePointHex, encryptedContentHex}
 
-export asymmetricDecryptOld = (secrets, privateKeyHex) ->
+export asymmetricDecryptOld = (secrets, secretKeyHex) ->
     AHex = secrets.referencePointHex || secrets.referencePoint
     gibbrishHex = secrets.encryptedContentHex || secrets.encryptedContent
     if !AHex? or !gibbrishHex? then throw new Error("Invalid secrets Object!")
-    # a = Private Key
+    # a = Secret Key
     # k = sha512(a) -> hashToScalar
     # G = basePoint
     # B = kG = Public Key
-    aBytes = tbut.hexToBytes(privateKeyHex)
+    aBytes = tbut.hexToBytes(secretKeyHex)
     kBigInt = hashToScalar(sha512Bytes(aBytes))
     
     # {A,X} = secrets
@@ -264,12 +264,12 @@ export asymmetricEncrypt = (content, publicKeyHex) ->
 
     return {referencePointHex, encryptedContentHex}
 
-export asymmetricDecrypt = (secrets, privateKeyHex) ->
+export asymmetricDecrypt = (secrets, secretKeyHex) ->
     AHex = secrets.referencePointHex || secrets.referencePoint
     gibbrishHex = secrets.encryptedContentHex || secrets.encryptedContent
     if !AHex? or !gibbrishHex? then throw new Error("Invalid secrets Object!")
 
-    kA = await noble.getSharedSecret(privateKeyHex, AHex)
+    kA = await noble.getSharedSecret(secretKeyHex, AHex)
     symkey = sha512Bytes(kA)
     # symkey = sha512Bytes(tbut.bytesToHex(kA))
 
@@ -294,12 +294,12 @@ export asymmetricEncryptBytes = (content, publicKeyBytes) ->
 
     return {referencePointBytes, encryptedContentBytes}
 
-export asymmetricDecryptBytes = (secrets, privateKeyBytes) ->
+export asymmetricDecryptBytes = (secrets, secretKeyBytes) ->
     ABytes = secrets.referencePointBytes || secrets.referencePoint
     gibbrishBytes = secrets.encryptedContentBytes || secrets.encryptedContent
     if !ABytes? or !gibbrishBytes? then throw new Error("Invalid secrets Object!")
 
-    kABytes = await noble.getSharedSecret(privateKeyBytes, ABytes)
+    kABytes = await noble.getSharedSecret(secretKeyBytes, ABytes)
     symkeyBytes = sha512Bytes(kABytes)
 
     content = symmetricDecryptBytes(gibbrishBytes, symkeyBytes)

@@ -36,18 +36,18 @@ secUtl.sha512Bytes( String ) -> Uint8Array | Buffer
 
 ## keys
 # secUtl.createKeyPair is secUtl.createKeyPairHex
-secUtl.createKeyPairHex() -> Object { privateKeyHex, publicKeyHex }
+secUtl.createKeyPairHex() -> Object { secretKeyHex, publicKeyHex }
 secUtl.createKeyPairHex() -> Object { StringHex, StringHex }
 
-secUtl.createKeyPairBytes() -> Object { privateKeyBytes, publicKeyBytes }
+secUtl.createKeyPairBytes() -> Object { secretKeyBytes, publicKeyBytes }
 secUtl.createKeyPairBytes() -> Object { Uint8Array, Uint8Array }
 
 
 # secUtl.publicKey is secUtl.publicKeyHex
-secUtl.publicKeyHex( privateKeyHex ) -> publicKeyHex
+secUtl.publicKeyHex( secretKeyHex ) -> publicKeyHex
 secUtl.publicKeyHex( StringHex ) -> StringHex
 
-secUtl.publicKeyBytes( privateKeyBytes ) -> publicKeyBytes
+secUtl.publicKeyBytes( secretKeyBytes ) -> publicKeyBytes
 secUtl.publicKeyBytes( Uint8Array ) -> Uint8Array
 
 
@@ -59,10 +59,10 @@ secUtl.createSymKeyBytes() -> Uint8Array
 
 ## signatures
 # secUtl.createSignature is secUtl.createSignatureHex
-secUtl.createSignatureHex( content, privateKey )
+secUtl.createSignatureHex( content, secretKey )
 secUtl.createSignatureHex( String, StringHex ) -> StringHex
 
-secUtl.createSignatureBytes( content, privateKey )
+secUtl.createSignatureBytes( content, secretKey )
 secUtl.createSignatureHex( String, Uint8Array ) -> Uint8Array
 
 
@@ -103,11 +103,11 @@ secUtl.asymmetricEncryptBytes( String, Uint8Array ) -> Object { Uint8Array, Uint
 
 
 # secUtl.asymmetricDecrypt is secUtl.asymmetricDecryptHex
-secUtl.asymmetricDecryptHex( secretsObject, privateKey )
+secUtl.asymmetricDecryptHex( secretsObject, secretKey )
 secUtl.asymmetricDecryptHex( Object { referencePointHex, encryptedContentsHex }, StringHex }, StringHex ) -> String
 secUtl.asymmetricDecryptHex( Object { StringHex, StringHex }, StringHex }, StringHex ) -> String
 
-secUtl.asymmetricDecryptBytes( secretsObject, privateKey )
+secUtl.asymmetricDecryptBytes( secretsObject, secretKey )
 secUtl.asymmetricDecryptBytes( Object { referencePointBytes, encryptedContentsBytes }, Uint8Array ) -> String
 secUtl.asymmetricDecryptBytes( Object { Uint8Array, Uint8Array }, Uint8Array ) -> String
 
@@ -131,7 +131,7 @@ Also the asymmetric encryption algorithm has slightly changed, specifically how 
 
 For conversion purposes we have included the old style functions as well, which only exist in the hex version:
 - asymmetricEncryptOld(content, publicKeyHex)
-- asymmetricDecryptOld(secrets, privateKeyHex)
+- asymmetricDecryptOld(secrets, secretKeyHex)
 
 
 ## Hex FTW
