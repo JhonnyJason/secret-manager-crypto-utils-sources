@@ -10,6 +10,8 @@ This is:
 - Sign/Verify via Ed25519
 - Asymmetric Encrypt/Decrypt in ElGamal style using Curve25519
 - Symmetric Encrypt/Decrypt with AES-256-CBC
+- SharedSecret in Raw and Hashed version as privA * pubB = privB * pubA
+- ReferencedSharedSecret - using a random PrivA and adding the referencePoint pubA - in Raw and Hashed version
 - Random length salts to mitigate Known Plaintext Attacks
 
 This is directly used from other parts of the [Secret Management](https://hackmd.io/PZjpRfzPSBCqS-8K54x2jA?view) system.
@@ -101,7 +103,6 @@ secUtl.asymmetricEncryptBytes( content, publicKey )
 secUtl.asymmetricEncryptBytes( String, Uint8Array ) -> Object { referencePointBytes, encryptedContentsBytes }
 secUtl.asymmetricEncryptBytes( String, Uint8Array ) -> Object { Uint8Array, Uint8Array }
 
-
 # secUtl.asymmetricDecrypt is secUtl.asymmetricDecryptHex
 secUtl.asymmetricDecryptHex( secretsObject, secretKey )
 secUtl.asymmetricDecryptHex( Object { referencePointHex, encryptedContentsHex }, StringHex }, StringHex ) -> String
@@ -110,6 +111,47 @@ secUtl.asymmetricDecryptHex( Object { StringHex, StringHex }, StringHex }, Strin
 secUtl.asymmetricDecryptBytes( secretsObject, secretKey )
 secUtl.asymmetricDecryptBytes( Object { referencePointBytes, encryptedContentsBytes }, Uint8Array ) -> String
 secUtl.asymmetricDecryptBytes( Object { Uint8Array, Uint8Array }, Uint8Array ) -> String
+
+
+## shared secret - hashed
+# secUtl.createSharedSecretHash is secUtl.createSharedSecretHashHex
+secUtl.createSharedSecretHashHex( secretKeyHex, publicKeyHex, context )
+secUtl.createSharedSecretHashHex( StringHex, StringHex, String ) -> StringHex
+
+secUtl.createSharedSecretHashBytes( secretKeyBytes, publicKeyBytes, context )
+secUtl.createSharedSecretHashBytes( Uint8Array, Uint8Array, String ) -> Uint8Array
+
+
+## shared secret - raw
+# secUtl.createSharedSecretHash is secUtl.createSharedSecretHashHex
+secUtl.createSharedSecretRawHex( secretKeyHex, publicKeyHex)
+secUtl.createSharedSecretRawHex( StringHex, StringHex ) -> StringHex
+
+secUtl.createSharedSecretRawBytes( secretKeyBytes, publicKeyBytes)
+secUtl.createSharedSecretRawBytes( Uint8Array, Uint8Array ) -> Uint8Array
+
+
+## referenced secret - hashed
+# secUtl.referencedSharedSecretHash is secUtl.referencedSharedSecretHashHex
+secUtl.referencedSharedSecretHashHex( secretKeyHex, publicKeyHex, context )
+secUtl.referencedSharedSecretHashHex( StringHex, StringHex, String ) -> Object { referencePointHex, sharedSecretHex}
+secUtl.referencedSharedSecretHashHex( StringHex, StringHex, String ) -> Object { StringHex, StringHex}
+
+secUtl.referencedSharedSecretHashBytes( secretKeyBytes, publicKeyBytes, context )
+secUtl.referencedSharedSecretHashBytes( Uint8Array, Uint8Array, String ) -> Object { referencePointBytes, sharedSecretBytes }
+secUtl.referencedSharedSecretHashBytes( Uint8Array, Uint8Array, String ) -> Object { Uint8Array, Uint8Array }
+
+## referenced secret - raw
+# secUtl.referencedSharedSecretRaw is secUtl.referencedSharedSecretRawHex
+secUtl.referencedSharedSecretRawHex( secretKeyHex, publicKeyHex )
+secUtl.referencedSharedSecretRawHex( StringHex, StringHex ) -> Object { referencePointHex, sharedSecretHex}
+secUtl.referencedSharedSecretRawHex( StringHex, StringHex ) -> Object { StringHex, StringHex}
+
+secUtl.referencedSharedSecretRawBytes( secretKeyBytes, publicKeyBytes)
+secUtl.referencedSharedSecretRawBytes( Uint8Array, Uint8Array) -> Object { referencePointBytes, sharedSecretBytes }
+secUtl.referencedSharedSecretRawBytes( Uint8Array, Uint8Array) -> Object { Uint8Array, Uint8Array }
+
+
 
 ## salts
 secUtl.createRandomLengthSalt() -> String
@@ -147,6 +189,7 @@ Because of reasons we assigned the standard `function` without the postfix to be
 
 *The reason is simply: The person who wants to skip the explicit version is more likely the be the one who needs the enhancanced readability later. ;-)*
 
+>> Not just is the difference between byte version and hex version not signification, also sometimes the byte version is even slower. Probably in later versions we will optimize and maybe even deprecate the bytes versions if there is not significant benefit to them.
 
 ## Encryption
 For the encryption functionality we use ed25519 keys for producing El-Gamal-style shared secret-keys which we then use for symmetrically encrypting the contents.
@@ -162,6 +205,48 @@ The result of this kind of encryption is always an Object like:
 The symmetric encryption uses `aes-256-cbc`.
 
 *Notice: it is your responsibility to salt your contents to be encrypted.*
+
+## Shared Secrets
+Image Alice has the keyPair `privA, pubA` and Bob `privB, pubB`
+
+The Shared Secrets work in this way:
+```coffee
+aliceSharedSecret = await secUtl.createSharedSecretRaw(privA, pubB) # 32 bytes HexString
+bobSharedSecret = await secUtl.createSharedSecretRaw(privB, pubA)
+(aliceSharedSecret == bobSharedSecret) # true
+
+```
+
+With the hashed version you may add an arbitrary context. This allows you to generate different sharedSecrets from the same key-pairs.
+```coffee
+context = "onetime-context@"+Date.now()
+aliceSharedSecret = await secUtl.createSharedSecretHash(privA, pubB, context) # 64 bytes HexString
+bobSharedSecret = await secUtl.createSharedSecretHash(privB, pubA, context)
+(aliceSharedSecret == bobSharedSecret) # true
+
+``` 
+
+## Referenced Secrets
+For the referenced shared secret there will be a random key generated to calculate the shared secret. The public Key then is also returned as "referencePointHex".
+
+```coffee
+referencedSecret = await secUtl.referencedSharedSecretRaw(pubB) # Object {referencePointHex, sharedSecretHex} 
+referencePoint = referencedSecret.referencePointHex # 32 bytes Hex String
+aliceSharedSecret = referencedSecret.sharedSecretHex  # 32 bytes Hex String
+bobSharedSecret = await secUtl.createSharedSecretRaw(privB, referencePointHex)
+(aliceSharedSecret == bobSharedSecret) # true
+
+```
+
+With the hashed version you may add an arbitrary context. This allows you to generate different sharedSecrets from the same key-pairs.
+```coffee
+context = "onetime-context@"+Date.now()
+sharedSecret = await secUtl.createSharedSecretHash(privA, pubB, context) # 64 bytes HexString
+sameSharedSecret = await secUtl.createSharedSecretHash(privB, pubA, context)
+(sharedSecret == sameSharedSecret) # true
+
+``` 
+
 
 ## Noble ed25519
 All of this is straight forward based on [noble-ed25519](https://github.com/paulmillr/noble-ed25519). A very concise and modern package for freely using the ed25519 algorithms. Big thanks for that!
@@ -179,43 +264,4 @@ All sorts of inputs are welcome, thanks!
 - Using AES-256-CBC in combination with this random length salt prefix effectivly eliminates the known plaintext attack surface.
 
 # License
-
-## The Unlicense JhonnyJason style
-
-- Information has no ownership.
-- Information only has memory to reside in and relations to be meaningful.
-- Information cannot be stolen. Only shared or destroyed.
-
-And you wish it has been shared before it is destroyed.
-
-The one claiming copyright or intellectual property either is really evil or probably has some insecurity issues which makes him blind to the fact that he also just connected information which was freely available to him.
-
-The value is not in him who "created" the information the value is what is being done with the information.
-So the restriction and friction of the informations' usage is exclusively reducing value overall.
-
-The only preceived "value" gained due to restriction is actually very similar to the concept of blackmail (power gradient, control and dependency).
-
-The real problems to solve are all in the "reward/credit" system and not the information distribution. Too much value is wasted because of not solving the right problem.
-
-I can only contribute in that way - none of the information is "mine" everything I "learned" I actually also copied.
-I only connect things to have something I feel is missing and share what I consider useful. So please use it without any second thought and please also share whatever could be useful for others. 
-
-I also could give credits to all my sources - instead I use the freedom and moment of creativity which lives therein to declare my opinion on the situation. 
-
-*Unity through Intelligence.*
-
-We cannot subordinate us to the suboptimal dynamic we are spawned in, just because power is actually driving all things around us.
-In the end a distributed network of intelligence where all information is transparently shared in the way that everyone has direct access to what he needs right now is more powerful than any brute power lever.
-
-The same for our programs as for us.
-
-It also is peaceful, helpful, friendly - decent. How it should be, because it's the most optimal solution for us human beings to learn, to connect to develop and evolve - not being excluded, let hanging and destroy oneself or others.
-
-If we really manage to build an real AI which is far superior to us it will unify with this network of intelligence.
-We never have to fear superior intelligence, because it's just the better engine connecting information to be most understandable/usable for the other part of the intelligence network.
-
-The only thing to fear is a disconnected unit without a sufficient network of intelligence on its own, filled with fear, hate or hunger while being very powerful. That unit needs to learn and connect to develop and evolve then.
-
-We can always just give information and hints :-) The unit needs to learn by and connect itself.
-
-Have a nice day! :D
+[Unlicense JhonnyJason style](https://hackmd.io/nCpLO3gxRlSmKVG3Zxy2hA?view)

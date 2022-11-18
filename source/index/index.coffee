@@ -197,7 +197,6 @@ export symmetricDecryptBytes = (gibbrishBytes, keyBytes) ->
 # Hex Version
 
 ############################################################
-# Compatibility version
 export asymmetricEncryptOld = (content, publicKeyHex) ->
     # a = Secret Key
     # k = sha512(a) -> hashToScalar
@@ -260,7 +259,6 @@ export asymmetricDecryptOld = (secrets, secretKeyHex) ->
     return content
 
 ############################################################
-# New Version
 export asymmetricEncrypt = (content, publicKeyHex) ->
     nBytes = noble.utils.randomPrivateKey()
     A = await noble.getPublicKey(nBytes)
@@ -327,7 +325,6 @@ export asymmetricDecryptBytes = (secrets, secretKeyBytes) ->
 # Hex Versions
 
 ############################################################
-# create shared secrets
 export createSharedSecretHash = (secretKeyHex, publicKeyHex, contextString = "") ->
     # n = SecretKey
     # A = referencePoint = nG
@@ -363,7 +360,6 @@ export createSharedSecretHashHex = createSharedSecretHash
 export createSharedSecretRawHex = createSharedSecretRaw
 
 ############################################################
-# create shared secrets with a new reference point
 export referencedSharedSecretHash = (publicKeyHex, contextString = "") ->
     # n = SecretKey
     # A = referencePoint = nG
@@ -408,7 +404,6 @@ export referencedSharedSecretRawHex = referencedSharedSecretRaw
 # Bytes Versions
 
 ############################################################
-# create shared secrets
 export createSharedSecretHashBytes = (secretKeyBytes, publicKeyBytes, contextString = "") ->
     # n = SecretKey
     # A = referencePoint = nG
@@ -439,7 +434,6 @@ export createSharedSecretRawBytes = (secretKeyBytes, publicKeyBytes) ->
     return sharedSecretBytes
 
 ############################################################
-# create shared secrets with a new reference point
 export referencedSharedSecretHashBytes = (publicKeyBytes, contextString = "") ->
     # n = SecretKey
     # A = referencePoint = nG
