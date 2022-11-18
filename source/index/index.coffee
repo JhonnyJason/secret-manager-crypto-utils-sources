@@ -98,23 +98,6 @@ export createPublicKeyBytes = (secretKeyBytes) -> await noble.getPublicKey(secre
 #endregion
 
 ############################################################
-#region contexed Id
-
-############################################################
-# Hex Version
-export contextId = (id, context) ->
-    return sha256Hex(id+context)
-
-export contextIdHex = contextId
-
-############################################################
-# Byte Version
-export contextIdBytes = (id, context) ->
-    return sha256Bytes(id+context)
-
-#endregion
-
-############################################################
 #region signatures
 
 ############################################################
@@ -139,50 +122,6 @@ export createSignatureBytes = (content, signingKeyBytes) ->
 export verifyBytes = (sigBytes, keyBytes, content) ->
     hashBytes = sha256Bytes(content)
     return await noble.verify(sigBytes, hashBytes, keyBytes)
-
-#endregion
-
-############################################################
-#region auth code
-
-############################################################
-# Hex Version
-export authCode = (seedHex, requestJSON) ->
-    requestString = JSON.stringify(requestJSON)
-    entropySource = seedHex + requestString
-    return sha256Hex(entropySource)
-    
-export authCodeHex = authCode
-
-############################################################
-# Byte Version
-export authCodeBytes = (seedBytes, requestJSON) ->
-    requestString = JSON.stringify(requestJSON)
-    seedHex = tbut.bytesToHex(seedBytes)
-    entropySource = seedHex + requestString
-    return sha256Bytes(entropySource)
-
-#endregion
-
-############################################################
-#region session key
-
-############################################################
-# Hex Version
-export sessionKey = (seedHex, requestJSON) ->
-    requestString = JSON.stringify(requestJSON)
-    entropySource = seedHex+requestString
-    return sha512Hex(entropySource)
-
-export sessionKeyHex = sessionKey
-
-############################################################
-# Byte Version
-export sessionKeyBytes = (seedBytes, requestJSON) ->
-    requestString = JSON.stringify(requestJSON)
-    seedHex = tbut.bytesToHex(seedBytes)
-    entropySource = seedHex+requestString
-    return sha512Bytes(entropySource)
 
 #endregion
 
@@ -377,7 +316,27 @@ export asymmetricDecryptBytes = (secrets, secretKeyBytes) ->
 #endregion
 
 ############################################################
-#region referenced shared secrets
+#region salts
+export createRandomLengthSalt = ->
+    loop
+        bytes = crypto.randomBytes(512)
+        for byte,i in bytes when byte == 0
+            return bytes.slice(0,i+1).toString("utf8")        
+
+export removeSalt = (content) ->
+    for char,i in content when char == "\0"
+        return content.slice(i+1)
+    throw new Error("No Salt termination found!")    
+
+#endregion
+
+
+
+############################################################
+#region new Functions on v0.2
+
+############################################################
+#region referenced/shared secrets
 
 ############################################################
 #region Hex Versions
@@ -537,23 +496,50 @@ export referencedSharedSecretRawBytes = (publicKeyBytes) ->
 #endregion
 
 ############################################################
-#region salts
-export createRandomLengthSalt = ->
-    loop
-        bytes = crypto.randomBytes(512)
-        for byte,i in bytes when byte == 0
-            return bytes.slice(0,i+1).toString("utf8")        
+#region auth code
 
-export removeSalt = (content) ->
-    for char,i in content when char == "\0"
-        return content.slice(i+1)
-    throw new Error("No Salt termination found!")    
+############################################################
+# Hex Version
+export authCode = (seedHex, requestJSON) ->
+    requestString = JSON.stringify(requestJSON)
+    entropySource = seedHex + requestString
+    return sha256Hex(entropySource)
+    
+export authCodeHex = authCode
+
+############################################################
+# Byte Version
+export authCodeBytes = (seedBytes, requestJSON) ->
+    requestString = JSON.stringify(requestJSON)
+    seedHex = tbut.bytesToHex(seedBytes)
+    entropySource = seedHex + requestString
+    return sha256Bytes(entropySource)
 
 #endregion
 
 ############################################################
-#region new Functions on v0.2
+#region session key
+
+############################################################
+# Hex Version
+export sessionKey = (seedHex, requestJSON) ->
+    requestString = JSON.stringify(requestJSON)
+    entropySource = seedHex+requestString
+    return sha512Hex(entropySource)
+
+export sessionKeyHex = sessionKey
+
+############################################################
+# Byte Version
+export sessionKeyBytes = (seedBytes, requestJSON) ->
+    requestString = JSON.stringify(requestJSON)
+    seedHex = tbut.bytesToHex(seedBytes)
+    entropySource = seedHex+requestString
+    return sha512Bytes(entropySource)
 
 #endregion
+
+#endregion
+
 
 #endregion
