@@ -20,7 +20,7 @@ This is directly used from other parts of the [Secret Management](https://hackmd
 Current Functionality
 ---------------------
 
-```coffeescript
+```coffee
 import *  as secUtl from "secret-manager-crypto-utils"
 
 ## shas
@@ -204,7 +204,30 @@ The result of this kind of encryption is always an Object like:
 
 The symmetric encryption uses `aes-256-cbc`.
 
-*Notice: it is your responsibility to salt your contents to be encrypted.*
+### Potential AES-CBC Weaknesses
+There are some potential weaknesses in CBC Mode.
+
+However if used well we donot suffer those weaknesses. 
+GCM seems less desirable for our use.
+
+These known weaknesses come from the lack of ciphertext integrity checks.
+That is if an attacker is able to change the ciphertext, in many cases CBC cannot detect the manipulation and the result is an altered plaintext after decryption.
+
+#### No Public IV
+We derive the IV from a shared Secret and thus an attacker does not know the IV.
+
+#### Salted Padding
+In our implementation we add random length salts with an identifyable ending as a prefix to the plaintext.
+
+- This eliminates the known plaintext attack surface
+- Can detect some manipulation
+
+#### No Oracles 
+Make sure to not provide any `oracle`. An `oracle` would be any, way how an attacker may verify if any change of the ciphertext still results in a valid decryption.
+
+#### Integrity Checks
+If you encrypt a file in this way and store it for later use
+
 
 ## Shared Secrets
 Image Alice has the keyPair `privA, pubA` and Bob `privB, pubB`
@@ -247,9 +270,15 @@ sameSharedSecret = await secUtl.createSharedSecretHash(privB, pubA, context)
 
 ``` 
 
-
 ## Noble ed25519
 All of this is straight forward based on [noble-ed25519](https://github.com/paulmillr/noble-ed25519). A very concise and modern package for freely using the ed25519 algorithms. Big thanks for that!
+
+## Salts
+- The salt functionality is to create a random string of random length terminated by 
+- The random length is limited to be at max 511bytes
+- The `removeSalt` would cut off all bytes until it reaches `SaltEnd\0` sequence
+- Using AES-256-CBC in combination with this random length salt prefix effectivly eliminates the known plaintext attack surface and reduces dangers of [bit-flipping](https://crypto.stackexchange.com/questions/66085/bit-flipping-attack-on-cbc-mode)
+
 
 ---
 
@@ -257,11 +286,6 @@ All sorts of inputs are welcome, thanks!
 
 ---
 
-## Salts
-- The salt functionality is to create a random string of random length terminated by a `0` byte
-- The random length is limited to be at max 511bytes
-- The `removeSalt` would cut off all bytes until it reaches the first `0` byte
-- Using AES-256-CBC in combination with this random length salt prefix effectivly eliminates the known plaintext attack surface.
 
 # License
 [Unlicense JhonnyJason style](https://hackmd.io/nCpLO3gxRlSmKVG3Zxy2hA?view)
