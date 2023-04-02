@@ -484,6 +484,96 @@ export removeSalt = (content) ->
         return content.slice(i+1)
     throw new Error("No Salt termination found!")    
 
+############################################################
+export saltContent = (content) ->
+    saltLength = 33 + (crypto.randomBytes(1)[0] & 127 )
+    # saltLength = 33
+    cBuf = Buffer.from(content, "utf8") 
+    contentLength = cBuf.length
+
+    salt = crypto.randomBytes(saltLength)
+    # Prefix is salt + 3 bytes
+    prefixLength = saltLength + 3
+    unpaddedLength = prefixLength + contentLength
+    overlap = unpaddedLength % 32
+    padding = 32 - overlap
+
+    fullLength = unpaddedLength + padding
+    # console.log(fullLength) # must be a factor of 32
+
+    resultBuffer = Buffer.alloc(fullLength)
+    # immediatly write the content to the resultBuffer
+    for c,idx in cBuf
+        resultBuffer[idx + prefixLength] = c
+
+    # The first 32 bytes of the prefix are 1:1 from the salt.
+    sum = 0 
+    idx = 32
+    while(idx--)
+        sum += salt[idx]
+        resultBuffer[idx] = salt[idx]
+
+    # the last byte of the prefix is the padding length
+    resultBuffer[saltLength + 2] = padding
+
+    # the postfix padding is the first salt bytes up to padding size
+    idx = 0    
+    end = fullLength - 1
+    while(idx < padding)
+        resultBuffer[end - idx] = salt[idx]
+        idx++
+
+
+    # the prefix keeps the sum of the salt values as ending identification 
+    # make sure this condition is not met before we reach the real end
+    idx = 32
+    while(idx < saltLength)
+        salt[idx+1] += (sum == (salt[idx]*256 + salt[idx+1]))
+        sum += salt[idx]
+        resultBuffer[idx] = salt[idx]
+        idx++
+
+    # save the sum in the right bytes
+    resultBuffer[saltLength] = (sum >> 8)
+    resultBuffer[saltLength + 1] = (sum % 256)
+
+    # in this case we have the condition met when just taking the most significatn bytes of the real sum into account
+    if resultBuffer[saltLength] == resultBuffer[saltLength - 1] and resultBuffer[saltLength + 1] == 2 * resultBuffer[saltLength]
+        resultBuffer[saltLength - 1]++
+        sum++
+        resultBuffer[saltLength] = (sum >> 8)
+        resultBuffer[saltLength + 1] = (sum % 256)
+
+    # console.log(resultBuffer)
+    # console.log("- - - - ")    
+    # console.log("sum: "+sum)
+    # console.log("padding: "+padding)
+    return resultBuffer
+
+
+export unsaltContent = (contentBuffer) ->
+    sum = 0 
+    idx = 32
+    bufLen = contentBuffer.length
+
+    while(idx--)
+        sum += contentBuffer[idx]
+
+    idx = 32
+    loop
+        if (sum == (contentBuffer[idx]*256 + contentBuffer[idx+1]))
+            start = idx + 3
+            end = bufLen - contentBuffer[idx+2]
+            break
+        sum += contentBuffer[idx]
+        idx++
+        if idx == bufLen then throw new Error("No valid salt found!")
+    # console.log("-> ")    
+    # console.log("sum: "+sum)    
+    # console.log("start: "+start)
+    # console.log("end: "+end)
+    return contentBuffer.toString("utf8", start, end)
+
 #endregion
 
 #endregion
