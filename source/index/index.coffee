@@ -57,6 +57,9 @@ export sha512Bytes = (content) ->
     hasher.update(content)
     return hasher.digest()
 
+############################################################
+noble.etc.sha512Sync = sha512Bytes
+
 #endregion
 
 ############################################################
@@ -64,9 +67,9 @@ export sha512Bytes = (content) ->
 
 ############################################################
 # Hex Version
-export createKeyPair =  ->
+export createKeyPair = ->
     secretKeyBytes = noble.utils.randomPrivateKey()
-    publicKeyBytes = await noble.getPublicKey(secretKeyBytes)
+    publicKeyBytes = noble.getPublicKey(secretKeyBytes)
     secretKeyHex = tbut.bytesToHex(secretKeyBytes)
     publicKeyHex = tbut.bytesToHex(publicKeyBytes)
     return {secretKeyHex, publicKeyHex}
@@ -76,7 +79,7 @@ export createSymKey = ->
     return tbut.bytesToHex(keyAndIV)
 
 export createPublicKey = (secretKeyHex) ->
-    publicKeyBytes = await noble.getPublicKey(secretKeyHex)
+    publicKeyBytes = noble.getPublicKey(tbut.hexToBytes(secretKeyHex))
     return tbut.bytesToHex(publicKeyBytes)
 
 export createKeyPairHex = createKeyPair
@@ -212,7 +215,7 @@ export symmetricDecryptBytes = (gibbrishBytes, keyBytes) ->
 #endregion
 
 ############################################################
-#region Unsalted symmetric encryption 
+#region Unsalted symmetric encryption
 
 ############################################################
 # Hex Version
