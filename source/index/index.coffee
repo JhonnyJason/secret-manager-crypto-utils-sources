@@ -5,7 +5,7 @@ import crypto from "crypto"
 
 ############################################################
 encAlgo = 'aes-256-cbc'
-authAlgo = 'aes-256-gcm'
+# authAlgo = 'aes-256-gcm'
 
 ORDER = BigInt(2) ** BigInt(252) + BigInt('27742317777372353535851937790883648493')
 
@@ -141,8 +141,9 @@ export symmetricEncrypt = (content, keyHex) ->
     # console.log aesKeyHex
     # console.log aesKeyHex.length
 
+    saltedContent = saltContent(content)
     cipher = crypto.createCipheriv(encAlgo, aesKeyBuffer, ivBuffer)
-    gibbrish = cipher.update(content, 'utf8', 'hex')
+    gibbrish = cipher.update(saltedContent, null, 'hex')
     gibbrish += cipher.final('hex')
     return gibbrish
 
@@ -159,10 +160,17 @@ export symmetricDecrypt = (gibbrishHex, keyHex) ->
     # console.log aesKeyHex.length
 
     decipher = crypto.createDecipheriv(encAlgo, aesKeyBuffer, ivBuffer)
-    content = decipher.update(gibbrishHex, 'hex', 'utf8')
-    content += decipher.final('utf8')
-    return content
+    saltedContent = decipher.update(gibbrishHex, 'hex')
+    finalContent = decipher.final()
+    if finalContent.length == 0 then return unsaltContent(saltedContent)
 
+    allSaltedContent = new Uint8Array(saltedContent.length + finalContent.length)
+    for b,i in saltContent
+        allSaltedContent[i] = b
+    for b,i in finalContent
+        allSaltedContent[saltedContent.length + i] = b
+    return unsaltContent(allSaltedContent)
+    
 export symmetricEncryptHex = symmetricEncrypt
 export symmetricDecryptHex = symmetricDecrypt
 ############################################################
@@ -171,20 +179,74 @@ export symmetricEncryptBytes = (content, keyBytes) ->
     ivBuffer = Buffer.from(keyBytes.buffer, 0, 16)
     aesKeyBuffer = Buffer.from(keyBytes.buffer, 16, 32)
     
+    saltedContent = saltContent(content)
     cipher = crypto.createCipheriv(encAlgo, aesKeyBuffer, ivBuffer)
-    gibbrish = cipher.update(content, 'utf8')
+    gibbrish = cipher.update(saltedContent)
     gibbrishFinal = cipher.final()
-    allGibbrish = Buffer.concat([gibbrish,gibbrishFinal])
-    return new Uint8Array(allGibbrish)
+    if gibbrishFinal.length == 0 then return new Uint8Array(gibbrish)
+    allGibbrish = new Uint8Array(gibbrishFinal.length + gibbrish.length)
+    for b,i in gibbrish
+        allGibbrish[i] = b
+    for b,i in gibbrishFinal
+        allGibbrish[gibbrish.length + i] = b
+    return allGibbrish
+    # allGibbrish = Buffer.concat([gibbrish,gibbrishFinal])
+    # return new Uint8Array(allGibbrish)
 
 export symmetricDecryptBytes = (gibbrishBytes, keyBytes) ->
     ivBuffer = Buffer.from(keyBytes.buffer, 0, 16)
     aesKeyBuffer = Buffer.from(keyBytes.buffer, 16, 32)
-    # gibbrishBuffer = Buffer.from(gibbrishBytes)
     
     decipher = crypto.createDecipheriv(encAlgo, aesKeyBuffer, ivBuffer)
-    content = decipher.update(gibbrishBytes, null, 'utf8')
-    # content = decipher.update(gibbrishBuffer, null, 'utf8')
+    saltedContent = decipher.update(gibbrishBytes)
+    finalContent = decipher.final()
+    if finalContent.length == 0 then return unsaltContent(saltedContent)
+
+    allSaltedContent = new Uint8Array(saltedContent.length + finalContent.length)
+    for b,i in saltContent
+        allSaltedContent[i] = b
+    for b,i in finalContent
+        allSaltedContent[saltedContent.length + i] = b
+    return unsaltContent(allSaltedContent)
+    
+#endregion
+
+############################################################
+#region Unsalted symmetric encryption 
+
+############################################################
+# Hex Version
+export symmetricEncryptUnsalted = (content, keyHex) ->
+    ivHex = keyHex.substring(0, 32)
+    ivBuffer = Buffer.from(ivHex, "hex")
+    aesKeyHex = keyHex.substring(32,96)
+    aesKeyBuffer = Buffer.from(aesKeyHex, "hex")
+    # console.log "- - ivHex: "
+    # console.log ivHex
+    # console.log ivHex.length
+    # console.log "- - aesKeyHex: "
+    # console.log aesKeyHex
+    # console.log aesKeyHex.length
+
+    cipher = crypto.createCipheriv(encAlgo, aesKeyBuffer, ivBuffer)
+    gibbrish = cipher.update(content, 'utf8', 'hex')
+    gibbrish += cipher.final('hex')
+    return gibbrish
+
+export symmetricDecryptUnsalted = (gibbrishHex, keyHex) ->
+    ivHex = keyHex.substring(0, 32)
+    ivBuffer = Buffer.from(ivHex, "hex")
+    aesKeyHex = keyHex.substring(32,96)
+    aesKeyBuffer = Buffer.from(aesKeyHex, "hex")
+    # console.log "- - ivHex: "
+    # console.log ivHex
+    # console.log ivHex.length
+    # console.log "- - aesKeyHex: "
+    # console.log aesKeyHex
+    # console.log aesKeyHex.length
+
+    decipher = crypto.createDecipheriv(encAlgo, aesKeyBuffer, ivBuffer)
+    content = decipher.update(gibbrishHex, 'hex', 'utf8')
     content += decipher.final('utf8')
     return content
 
@@ -486,12 +548,12 @@ export removeSalt = (content) ->
 
 ############################################################
 export saltContent = (content) ->
-    saltLength = 33 + (crypto.randomBytes(1)[0] & 127 )
-    # saltLength = 33
-    cBuf = Buffer.from(content, "utf8") 
-    contentLength = cBuf.length
+    content = tbut.utf8ToBytes(content)
+    contentLength = content.length
 
+    saltLength = 33 + (crypto.randomBytes(1)[0] & 127 )
     salt = crypto.randomBytes(saltLength)
+    
     # Prefix is salt + 3 bytes
     prefixLength = saltLength + 3
     unpaddedLength = prefixLength + contentLength
@@ -499,11 +561,10 @@ export saltContent = (content) ->
     padding = 32 - overlap
 
     fullLength = unpaddedLength + padding
-    # console.log(fullLength) # must be a factor of 32
 
-    resultBuffer = Buffer.alloc(fullLength)
+    resultBuffer = new Uint8Array(fullLength)
     # immediatly write the content to the resultBuffer
-    for c,idx in cBuf
+    for c,idx in content
         resultBuffer[idx + prefixLength] = c
 
     # The first 32 bytes of the prefix are 1:1 from the salt.
@@ -528,6 +589,9 @@ export saltContent = (content) ->
     # make sure this condition is not met before we reach the real end
     idx = 32
     while(idx < saltLength)
+        # when the condition is met we add +1 to the LSB(salt[idx+1]) to destroy it 
+        # Notice! If we add +1 to the MSB(salt[idx]) then we change what we cheched for previously, which might accidentally result in the condition being met now one byte before, which we donot check for ever again
+        # if (sum == (salt[idx]*256 + salt[idx+1])) then salt[idx+1]++
         salt[idx+1] += (sum == (salt[idx]*256 + salt[idx+1]))
         sum += salt[idx]
         resultBuffer[idx] = salt[idx]
@@ -544,35 +608,44 @@ export saltContent = (content) ->
         resultBuffer[saltLength] = (sum >> 8)
         resultBuffer[saltLength + 1] = (sum % 256)
 
-    # console.log(resultBuffer)
-    # console.log("- - - - ")    
-    # console.log("sum: "+sum)
-    # console.log("padding: "+padding)
     return resultBuffer
 
+export unsaltContent = (contentBytes) ->
+    fullLength = contentBytes.length
 
-export unsaltContent = (contentBuffer) ->
+    if fullLength > 160 then limit = 160
+    else limit = fullLength
+    overLimit = limit + 1
+
     sum = 0 
     idx = 32
-    bufLen = contentBuffer.length
-
     while(idx--)
-        sum += contentBuffer[idx]
+        sum += contentBytes[idx]
 
     idx = 32
-    loop
-        if (sum == (contentBuffer[idx]*256 + contentBuffer[idx+1]))
+    while idx < overLimit
+        if (sum == (contentBytes[idx]*256 + contentBytes[idx+1]))
             start = idx + 3
-            end = bufLen - contentBuffer[idx+2]
+            padding = contentBytes[idx+2]
             break
-        sum += contentBuffer[idx]
+        sum += contentBytes[idx]
         idx++
-        if idx == bufLen then throw new Error("No valid salt found!")
-    # console.log("-> ")    
-    # console.log("sum: "+sum)    
-    # console.log("start: "+start)
-    # console.log("end: "+end)
-    return contentBuffer.toString("utf8", start, end)
+
+    if idx > limit then throw new Error("Unsalt: No valid prefix ending found!")
+    
+
+    # Check if the padding matches the salt - so we can verify here nobody has tampered with it
+    idx = 0
+    end = fullLength - 1
+    invalid = 0
+    while idx < padding
+        invalid += (contentBytes[idx] != contentBytes[end - idx])
+        idx++
+    if invalid then throw new Error("Unsalt: Postfix and prefix did not match as expected!")
+    end = fullLength - padding
+
+    contentBytes = contentBytes.slice(start, end)
+    return tbut.bytesToUtf8(contentBytes)
 
 #endregion
 

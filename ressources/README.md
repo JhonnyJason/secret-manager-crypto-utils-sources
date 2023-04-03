@@ -93,6 +93,7 @@ secUtl.symmetricDecryptBytes( encryptedContent, symKey )
 secUtl.symmetricDecryptBytes( Uint8Array, Uint8Array ) -> String
 
 
+
 ## encryption - asymmetric
 # secUtl.asymmetricEncrypt is secUtl.asymmetricEncryptHex
 secUtl.asymmetricEncryptHex( content, publicKey )
@@ -175,21 +176,29 @@ For conversion purposes we have included the old style functions as well, which 
 - asymmetricEncryptOld(content, publicKeyHex)
 - asymmetricDecryptOld(secrets, secretKeyHex)
 
+## Breaking Updates
+`0.2.x` -> `0.3.y`
+------------------
+Since `v0.3.0` we have fixed some security concerns rooting from unauthenticated and unpadded use of AES-CBC.
+
+This is the the salt function has changed significantly to wrap the plaintext into an padded and verifiable envelope of random numbers.
+
+Also as a result of this we use this salt on our symmetricEncrypt function directly and don't leave it up to the developer to manually add the salt or not.
+
+However for compatibility purposes with old Code we include the hex versions of the function as:
+- symmetricEncryptUnsalted(content, keyHex)
+- symmetricDecryptUnsalted(content, keyHex)
+
+Also we keep the old salt functions as they were:
+- createRandomLengthSalt()
+- removeSalt(content)
+
 
 ## Hex FTW
 It is adivsable  that you stare all encrypted contents, signatures and keys in hex strings. This appears to be the most superior way of how to universally transfer byte information.
 
 The big wins of hex in readability and processability beats out the "downside" of being 2x the size. Also the performance loss is in most cases neglible ~ < 10%.
 
-## Performance is more important?
-We also have the versions using bytes, buffers, and specifically Uint8Arrays. To skip all the conversions back and forth. Use the Uint8Arrays in your code and use the byte-versions then.
-
-We have for each function the `functionHex` version and the `functionBytes` version.
-Because of reasons we assigned the standard `function` without the postfix to be the hex version.
-
-*The reason is simply: The person who wants to skip the explicit version is more likely the be the one who needs the enhancanced readability later. ;-)*
-
->> Not just is the difference between byte version and hex version not signification, also sometimes the byte version is even slower. Probably in later versions we will optimize and maybe even deprecate the bytes versions if there is not significant benefit to them.
 
 ## Encryption
 For the encryption functionality we use ed25519 keys for producing El-Gamal-style shared secret-keys which we then use for symmetrically encrypting the contents.
@@ -206,31 +215,21 @@ The symmetric encryption uses `aes-256-cbc`.
 
 ### Potential AES-CBC Weaknesses
 There are some potential weaknesses in CBC Mode.
+- Padding Oracle Attacks
+- Bit Flipping
+- IV Reuse
 
-However if used well we donot suffer those weaknesses. 
-GCM seems less desirable for our use.
+While for most cases GCM is recommended to use instead it seems less desirable for our use. Basically we just have to use CBC carefully.
 
-These known weaknesses come from the lack of ciphertext integrity checks.
-That is if an attacker is able to change the ciphertext, in many cases CBC cannot detect the manipulation and the result is an altered plaintext after decryption.
+One part of the solution is our new salt introduced on `v0.3.0`. It is a padded verifiable envelope of our plaintext consisting of random bytes. 
+If any bit is flipped we should see that this envelope has become invalid.
 
-#### No Public IV
-We derive the IV from a shared Secret and thus an attacker does not know the IV.
+Also generally we donot provide any oracle. Most of these potential attacks rely on an oracle. Because an attacker could try to flip muliple bits in an attempt to cover up the manipulation. If we provide an oracle which could quickly tell the attacker that the message was still valid or not then there is some surface of an attack. 
 
-#### Salted Padding
-In our implementation we add random length salts with an identifyable ending as a prefix to the plaintext.
-
-- This eliminates the known plaintext attack surface
-- Can detect some manipulation
-
-#### No Oracles 
-Make sure to not provide any `oracle`. An `oracle` would be any, way how an attacker may verify if any change of the ciphertext still results in a valid decryption.
-
-#### Integrity Checks
-If you encrypt a file in this way and store it for later use
-
+For our purpose what we encrypt are well-kept secrets with unique keys. Only to be accessed sporadically by the consumer having a valid signature. The Service guarantees uncorrupted storage of these secrets - usually signing the stored data which makes it tamper-proof at that level already. If the secret the consumer receives is corrupted this would immediatly break the trust to the service and any secrets from this server cannot be trusted anymore.
 
 ## Shared Secrets
-Image Alice has the keyPair `privA, pubA` and Bob `privB, pubB`
+Imagine Alice has the keyPair `privA, pubA` and Bob `privB, pubB`
 
 The Shared Secrets work in this way:
 ```coffee
@@ -250,7 +249,7 @@ bobSharedSecret = await secUtl.createSharedSecretHash(privB, pubA, context)
 ``` 
 
 ## Referenced Secrets
-For the referenced shared secret there will be a random key generated to calculate the shared secret. The public Key then is also returned as "referencePointHex".
+For the referenced shared secret there will be a random key generated to calculate the shared secret. The public Key of it then is also returned as "referencePointHex".
 
 ```coffee
 referencedSecret = await secUtl.referencedSharedSecretRaw(pubB) # Object {referencePointHex, sharedSecretHex} 
@@ -273,11 +272,32 @@ sameSharedSecret = await secUtl.createSharedSecretHash(privB, pubA, context)
 ## Noble ed25519
 All of this is straight forward based on [noble-ed25519](https://github.com/paulmillr/noble-ed25519). A very concise and modern package for freely using the ed25519 algorithms. Big thanks for that!
 
-## Salts
-- The salt functionality is to create a random string of random length terminated by 
+## Old Salts
+- The salt functionality is to create a random string of random length terminated by `\0`
 - The random length is limited to be at max 511bytes
-- The `removeSalt` would cut off all bytes until it reaches `SaltEnd\0` sequence
+- The `removeSalt` would cut off all bytes until it reaches `\0`
 - Using AES-256-CBC in combination with this random length salt prefix effectivly eliminates the known plaintext attack surface and reduces dangers of [bit-flipping](https://crypto.stackexchange.com/questions/66085/bit-flipping-attack-on-cbc-mode)
+
+## New Salts
+Similar to the old Salt we add a randomness in length in form of a random prefix to obsucate where potentially known plaintext could really be.
+
+Newly we also add a padding, so we have no "virtually predictable" ending. 
+Plus this padding verifies if the random prefix we added is still intact.
+
+### Creation of the Salt Envelope
+- We decide a random length between 33 bytes and 160 bytes and fill it with random bytes (least one full block is full of random bytes)
+- We sum up all all bytes as Uint8 and write the sum as BE Uint16 to the next 2 bytes (we also make sure this condition is not accedentally met)
+- We calculate the required padding and write this number to be next byte (this is the full prefix then)
+- We mirror the first bytes of the salt to fill the padding (this is the full postfix)
+- We write the prefix + plaintext + postfix as the new data to be encrypted
+
+### Verification of the Salt Envelope
+- We start to sum up all bytes as Uint8
+- Along the way we check if the next 2bytes interpreted as BE Uint16 are equal to our sum
+- If the condition is met we know the prefix length and postfix length - thus where the plaintext starts and ends
+- We check if the bytes of the postfix match the the expected ones in the prefix 
+- If the postfix does not fully match the prefix, then we know the message has been corrupted
+- Also if the condition is not met within our expected limit, we know the message has been corrupted
 
 
 ---
