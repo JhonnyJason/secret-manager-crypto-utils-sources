@@ -53,9 +53,9 @@ await secUtl.publicKeyBytes( Uint8Array ) -> Uint8Array
 
 
 #secUtl.createSymKey = secUtl.createSymKeyHex
-await secUtl.createSymKeyHex() -> StringHex 
+secUtl.createSymKeyHex() -> StringHex 
 
-await secUtl.createSymKeyBytes() -> Uint8Array
+secUtl.createSymKeyBytes() -> Uint8Array
 
 
 ## signatures
@@ -114,42 +114,42 @@ await secUtl.asymmetricDecryptBytes( Object { Uint8Array, Uint8Array }, Uint8Arr
 
 
 ## shared secret - hashed
-# secUtl.createSharedSecretHash is secUtl.createSharedSecretHashHex
-await secUtl.createSharedSecretHashHex( secretKeyHex, publicKeyHex, context )
-await secUtl.createSharedSecretHashHex( StringHex, StringHex, String ) -> StringHex
+# secUtl.diffieHellmanSecretHash is secUtl.diffieHellmanSecretHashHex
+await secUtl.diffieHellmanSecretHashHex( secretKeyHex, publicKeyHex, context )
+await secUtl.diffieHellmanSecretHashHex( StringHex, StringHex, String ) -> StringHex
 
-await secUtl.createSharedSecretHashBytes( secretKeyBytes, publicKeyBytes, context )
-await secUtl.createSharedSecretHashBytes( Uint8Array, Uint8Array, String ) -> Uint8Array
+await secUtl.diffieHellmanSecretHashBytes( secretKeyBytes, publicKeyBytes, context )
+await secUtl.diffieHellmanSecretHashBytes( Uint8Array, Uint8Array, String ) -> Uint8Array
 
 
 ## shared secret - raw
-# secUtl.createSharedSecretHash is secUtl.createSharedSecretHashHex
-await secUtl.createSharedSecretRawHex( secretKeyHex, publicKeyHex)
-await secUtl.createSharedSecretRawHex( StringHex, StringHex ) -> StringHex
+# secUtl.diffieHellmanSecretHash is secUtl.diffieHellmanSecretHashHex
+await secUtl.diffieHellmanSecretRawHex( secretKeyHex, publicKeyHex)
+await secUtl.diffieHellmanSecretRawHex( StringHex, StringHex ) -> StringHex
 
-await secUtl.createSharedSecretRawBytes( secretKeyBytes, publicKeyBytes)
-await secUtl.createSharedSecretRawBytes( Uint8Array, Uint8Array ) -> Uint8Array
+await secUtl.diffieHellmanSecretRawBytes( secretKeyBytes, publicKeyBytes)
+await secUtl.diffieHellmanSecretRawBytes( Uint8Array, Uint8Array ) -> Uint8Array
 
 
 ## referenced secret - hashed
-# secUtl.referencedSharedSecretHash is secUtl.referencedSharedSecretHashHex
-await secUtl.referencedSharedSecretHashHex( secretKeyHex, publicKeyHex, context )
-await secUtl.referencedSharedSecretHashHex( StringHex, StringHex, String ) -> Object { referencePointHex, sharedSecretHex}
-await secUtl.referencedSharedSecretHashHex( StringHex, StringHex, String ) -> Object { StringHex, StringHex}
+# secUtl.elGamalSecretHash is secUtl.elGamalSecretHashHex
+await secUtl.elGamalSecretHashHex( secretKeyHex, publicKeyHex, context )
+await secUtl.elGamalSecretHashHex( StringHex, StringHex, String ) -> Object { referencePointHex, sharedSecretHex}
+await secUtl.elGamalSecretHashHex( StringHex, StringHex, String ) -> Object { StringHex, StringHex}
 
-await secUtl.referencedSharedSecretHashBytes( secretKeyBytes, publicKeyBytes, context )
-await secUtl.referencedSharedSecretHashBytes( Uint8Array, Uint8Array, String ) -> Object { referencePointBytes, sharedSecretBytes }
-await secUtl.referencedSharedSecretHashBytes( Uint8Array, Uint8Array, String ) -> Object { Uint8Array, Uint8Array }
+await secUtl.elGamalSecretHashBytes( secretKeyBytes, publicKeyBytes, context )
+await secUtl.elGamalSecretHashBytes( Uint8Array, Uint8Array, String ) -> Object { referencePointBytes, sharedSecretBytes }
+await secUtl.elGamalSecretHashBytes( Uint8Array, Uint8Array, String ) -> Object { Uint8Array, Uint8Array }
 
 ## referenced secret - raw
-# secUtl.referencedSharedSecretRaw is secUtl.referencedSharedSecretRawHex
-await secUtl.referencedSharedSecretRawHex( secretKeyHex, publicKeyHex )
-await secUtl.referencedSharedSecretRawHex( StringHex, StringHex ) -> Object { referencePointHex, sharedSecretHex}
-await secUtl.referencedSharedSecretRawHex( StringHex, StringHex ) -> Object { StringHex, StringHex}
+# secUtl.elGamalSecretRaw is secUtl.elGamalSecretRawHex
+await secUtl.elGamalSecretRawHex( secretKeyHex, publicKeyHex )
+await secUtl.elGamalSecretRawHex( StringHex, StringHex ) -> Object { referencePointHex, sharedSecretHex}
+await secUtl.elGamalSecretRawHex( StringHex, StringHex ) -> Object { StringHex, StringHex}
 
-await secUtl.referencedSharedSecretRawBytes( secretKeyBytes, publicKeyBytes)
-await secUtl.referencedSharedSecretRawBytes( Uint8Array, Uint8Array) -> Object { referencePointBytes, sharedSecretBytes }
-await secUtl.referencedSharedSecretRawBytes( Uint8Array, Uint8Array) -> Object { Uint8Array, Uint8Array }
+await secUtl.elGamalSecretRawBytes( secretKeyBytes, publicKeyBytes)
+await secUtl.elGamalSecretRawBytes( Uint8Array, Uint8Array) -> Object { referencePointBytes, sharedSecretBytes }
+await secUtl.elGamalSecretRawBytes( Uint8Array, Uint8Array) -> Object { Uint8Array, Uint8Array }
 
 
 ## salts
@@ -164,7 +164,7 @@ secUtl.unsaltContent( Uint8Array ) -> String
 ------------------
 Since `v0.3.0` we have fixed some security concerns rooting from unauthenticated and unpadded use of AES-CBC.
 
-This is the the salt function has changed significantly to wrap the plaintext into an padded and verifiable envelope of random numbers.
+This is the new salt function has changed significantly. It wraps the plaintext into an padded and verifiable envelope of random numbers.
 
 Also as a result of this we use this salt on our symmetricEncrypt function directly and don't leave it up to the developer to manually add the salt or not.
 
@@ -174,6 +174,10 @@ Also we decided to ditch backwards compatibility from this point dropping:
 - assymetricDecryptOld
 - createRandomLengthSalt
 - removeSalt
+
+**Notice:** the inner Workings of the asymmetric encryption has changend. (Now we are sticking with the Edwards curve for multiplication instead of a Point Transformation to Montgomery coordinates for calculating the shared secret) 
+
+These changes mean that **you cannot decrypt any secrets encrypted with an earlier version of this library**.
 
 When dealing with old encrypted secrets - better use the the old packages like this
 
@@ -206,14 +210,15 @@ There are some potential weaknesses in CBC Mode.
 - Bit Flipping
 - IV Reuse
 
-While for most cases GCM is recommended to use instead it seems less desirable for our use. Basically we just have to use CBC carefully.
+While for most cases GCM is recommended to use, the CBC Mode just tastes better.
 
 One part of the solution is our new salt-envelope introduced on `v0.3.0`. It is a padded verifiable envelope of our plaintext consisting of random bytes. 
 If any bit is flipped we should see that this envelope has become invalid.
 
 Also generally we donot provide any oracle. Most of these potential attacks rely on an oracle. Because an attacker could try to flip muliple bits in an attempt to cover up the manipulation. If we provide an oracle which could quickly tell the attacker that the message was still valid or not then there is some surface of an attack.
 
-For our purpose what we encrypt are well-kept secrets with unique keys. Only to be accessed sporadically by the consumer. A Service guarantees uncorrupted storage of these secrets - usually signing the stored data which makes it tamper-proof at that level anyways. If the consumer receives a corrupted secret this means the service has been corrupted and the recovery scenario would not look like requesting the secret over and over again until decryption is achieved.
+For our purpose what we encrypt are well-kept secrets with unique keys and unique IVs. Only to be accessed sporadically by the consumer. A Service guarantees uncorrupted storage of these secrets - preferrably signing the stored data which makes it tamper-proof at that level anyways. If the consumer receives a corrupted secret this means the service has been corrupted and the recovery scenario would not look like requesting the secret over and over again until decryption is achieved.
+
 
 ## Salt Envelope
 We random length prefix of random bytes to obsucate where potentially known plaintext could be.
@@ -237,12 +242,19 @@ At the same time the padding verifies if the random prefix we added is still int
 - Also if the condition is not met within our expected limit, we know the message has been corrupted
 
 ## Shared Secrets
+We also offer a direct solution to just use these shared secrets.
+
+We may apply 2 different styles:
+- diffieHellmanSecret = blending private with public key
+- elGamalSecret = using an ephemeral private key to be blended with the target users public key, also add the public key as reference for the target user
+
+### DiffieHellman Secrets
 Imagine Alice has the keyPair `privA, pubA` and Bob `privB, pubB`
 
 The Shared Secrets work in this way:
 ```coffee
-aliceSharedSecret = await secUtl.createSharedSecretRaw(privA, pubB) # 32 bytes HexString
-bobSharedSecret = await secUtl.createSharedSecretRaw(privB, pubA)
+aliceSharedSecret = await secUtl.diffieHellmanSecretRaw(privA, pubB) # 32 bytes HexString
+bobSharedSecret = await secUtl.diffieHellmanSecretRaw(privB, pubA)
 (aliceSharedSecret == bobSharedSecret) # true
 
 ```
@@ -250,30 +262,33 @@ bobSharedSecret = await secUtl.createSharedSecretRaw(privB, pubA)
 With the hashed version you may add an arbitrary context. This allows you to generate different sharedSecrets from the same key-pairs.
 ```coffee
 context = "onetime-context@"+Date.now()
-aliceSharedSecret = await secUtl.createSharedSecretHash(privA, pubB, context) # 64 bytes HexString
-bobSharedSecret = await secUtl.createSharedSecretHash(privB, pubA, context)
+aliceSharedSecret = await secUtl.diffieHellmanSecretHash(privA, pubB, context) # 64 bytes HexString
+bobSharedSecret = await secUtl.diffieHellmanSecretHash(privB, pubA, context)
 (aliceSharedSecret == bobSharedSecret) # true
 
 ``` 
 
-## Referenced Secrets
-For the referenced shared secret there will be a random key generated to calculate the shared secret. The public Key of it then is also returned as "referencePointHex".
+### ElGamal Secrets
+ElGamal style is relevant for Alice - using any random ephemeral key instead of `privA`.
+Bob would use the `diffiHellmanSecret` functions for blending with the `referencePoint`.
 
 ```coffee
-referencedSecret = await secUtl.referencedSharedSecretRaw(pubB) # Object {referencePointHex, sharedSecretHex} 
-referencePoint = referencedSecret.referencePointHex # 32 bytes Hex String
-aliceSharedSecret = referencedSecret.sharedSecretHex  # 32 bytes Hex String
-bobSharedSecret = await secUtl.createSharedSecretRaw(privB, referencePointHex)
+elGamalSecret = await secUtl.elGamalSecretRaw(pubB) # Object {referencePointHex, sharedSecretHex} 
+referencePoint = elGamalSecret.referencePointHex # 32 bytes Hex String
+aliceSharedSecret = elGamalSecret.sharedSecretHex  # 32 bytes Hex String
+bobSharedSecret = await secUtl.diffieHellmanSecretRaw(privB, referencePointHex)
 (aliceSharedSecret == bobSharedSecret) # true
 
 ```
 
-With the hashed version you may add an arbitrary context. This allows you to generate different sharedSecrets from the same key-pairs.
+
 ```coffee
 context = "onetime-context@"+Date.now()
-sharedSecret = await secUtl.createSharedSecretHash(privA, pubB, context) # 64 bytes HexString
-sameSharedSecret = await secUtl.createSharedSecretHash(privB, pubA, context)
-(sharedSecret == sameSharedSecret) # true
+elGamalSecret = await secUtl.elGamalSecretHash(pubB, context) # Object {referencePointHex, sharedSecretHex}
+referencePoint = elGamalSecret.referencePointHex # 32 bytes Hex String
+aliceSharedSecret = elGamalSecret.sharedSecretHex  # 64 bytes Hex String
+bobSharedSecret = await secUtl.diffieHellmanSecretHash(privB, referencePointHex, context)
+(aliceSharedSecret == bobSharedSecret) # true
 
 ``` 
 

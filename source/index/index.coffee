@@ -384,147 +384,224 @@ export asymmetricDecryptBytes = (secrets, secretKeyBytes) ->
 # Hex Versions
 
 ############################################################
-export createSharedSecretHash = (secretKeyHex, publicKeyHex, contextString = "") ->
-    # n = SecretKey
-    # A = referencePoint = nG
-    # B = publicKey = lG
-    # nB = shared Secret = nlG
-    nBytes = tbut.hexToBytes(secretKeyHex)
-    BBytes = tbut.hexToBytes(publicKeyHex)
+export diffieHellmanSecretHash = (secretKeyHex, publicKeyHex, contextString = "") ->
+    # a = our SecretKey
+    # k = sha512(a) -> hashToScalar (scalar for multiplication)
+    # B = lG = target User Public Key
+    # kB = klG = shared Secret
+    aBytes = tbut.hexToBytes(secretKeyHex)
+    kBigInt = hashToScalar(sha512Bytes(aBytes))
+    B = ed255.ExtendedPoint.fromHex(publicKeyHex)
     
-    nBBytes = ed255.getSharedSecret(nBytes, BBytes)
-
+    # A reference Point
+    kB = B.multiply(kBigInt)
+    kBBytes = kB.toRawBytes()
     cBytes = tbut.utf8ToBytes(contextString)
-    seedBytes = Buffer.concat([nBBytes, cBytes])
 
-    sharedSecretBytes = sha512Bytes(seedBytes)
+    seedBytes = new Uint8Array(kBBytes.length + cBytes.length)
+    for b,i in kBBytes
+        seedBytes[i] = b
+    for b,i in cBytes
+        seedBytes[kBBytes.length + i] = b
 
-    sharedSecretHex = tbut.bytesToHex(sharedSecretBytes) 
+    sharedSecretHex = sha512Hex(seedBytes)
     return sharedSecretHex
 
-export createSharedSecretRaw = (secretKeyHex, publicKeyHex) ->
-    # n = SecretKey
-    # A = referencePoint = nG
-    # B = publicKey = lG
-    # nB = shared Secret = nlG
-    nBytes = tbut.hexToBytes(secretKeyHex)
-    BBytes = tbut.hexToBytes(publicKeyHex)
+export diffieHellmanSecretRaw = (secretKeyHex, publicKeyHex) ->
+    # a = our SecretKey
+    # k = sha512(a) -> hashToScalar (scalar for multiplication)
+    # B = lG = target User Public Key
+    # kB = klG = shared Secret
+    aBytes = tbut.hexToBytes(secretKeyHex)
+    kBigInt = hashToScalar(sha512Bytes(aBytes))
+    B = ed255.ExtendedPoint.fromHex(publicKeyHex)
     
-    sharedSecretBytes = ed255.getSharedSecret(nBytes, BBytes)
+    kB = B.multiply(kBigInt)
 
+    sharedSecretBytes = kB.toRawBytes()
     sharedSecretHex = tbut.bytesToHex(sharedSecretBytes) 
     return sharedSecretHex
 
-export createSharedSecretHashHex = createSharedSecretHash
-export createSharedSecretRawHex = createSharedSecretRaw
+export diffieHellmanSecretHashHex = diffieHellmanSecretHash
+export diffieHellmanSecretRawHex = diffieHellmanSecretRaw
 
 ############################################################
-export referencedSharedSecretHash = (publicKeyHex, contextString = "") ->
-    # n = SecretKey
-    # A = referencePoint = nG
-    # B = publicKey = lG
-    # nB = shared Secret = nlG
+export elGamalSecretHash = (publicKeyHex, contextString = "") ->
+    # a = Secret Key of target user
+    # k = sha512(a) -> hashToScalar (scalar for multiplication)
+    # G = basePoint
+    # B = kG = Public Key
+    B = ed255.ExtendedPoint.fromHex(publicKeyHex)
+
+    # n = new one-time secret (generated forgotten about)
+    # l = sha512(n) -> hashToScalar (scalar for multiplication)
+    # A = lG = one time public key = reference point
+    # lB = lkG = shared secret
+    # key = sha512(lB)
+    # X = symmetricEncrypt(content, key)
+    # {A,X} = data for targt user
+
+    # n = one-time secret -> l
     nBytes = ed255.utils.randomPrivateKey()
+    lBigInt = hashToScalar(sha512Bytes(nBytes))
     
-    BBytes = tbut.hexToBytes(publicKeyHex)
+    # A reference Point
     ABytes = await ed255.getPublicKeyAsync(nBytes)
-    
-    nBBytes = ed255.getSharedSecret(nBytes, BBytes)
+    # lB = lkG = shared Secret
+    lB = await B.multiply(lBigInt)
+    lBBytes = lB.toRawBytes()
 
     cBytes = tbut.utf8ToBytes(contextString)
-    seedBytes = Buffer.concat([nBBytes, cBytes])
 
-    sharedSecretBytes = sha512Bytes(seedBytes)
+    seedBytes = new Uint8Array(lBBytes.length + cBytes.length)
+    for b,i in lBBytes
+        seedBytes[i] = b
+    for b,i in cBytes
+        seedBytes[lBBytes.length + i] = b
 
-    sharedSecretHex = tbut.bytesToHex(sharedSecretBytes) 
+    sharedSecretHex = sha512Hex(seedBytes)
     referencePointHex = tbut.bytesToHex(ABytes)
     return { referencePointHex, sharedSecretHex }
 
-export referencedSharedSecretRaw = (publicKeyHex) ->
-    # n = SecretKey
-    # A = referencePoint = nG
-    # B = publicKey = lG
-    # nB = shared Secret = nlG
+export elGamalSecretRaw = (publicKeyHex) ->
+    # a = Secret Key of target user
+    # k = sha512(a) -> hashToScalar (scalar for multiplication)
+    # G = basePoint
+    # B = kG = Public Key
+    B = ed255.ExtendedPoint.fromHex(publicKeyHex)
+
+    # n = new one-time secret (generated forgotten about)
+    # l = sha512(n) -> hashToScalar (scalar for multiplication)
+    # A = lG = one time public key = reference point
+    # lB = lkG = shared secret
+    # key = sha512(lB)
+    # X = symmetricEncrypt(content, key)
+    # {A,X} = data for targt user
+
+    # n = one-time secret -> l
     nBytes = ed255.utils.randomPrivateKey()
+    lBigInt = hashToScalar(sha512Bytes(nBytes))
     
-    BBytes = tbut.hexToBytes(publicKeyHex)
+    # A reference Point
     ABytes = await ed255.getPublicKeyAsync(nBytes)
+    # lB = lkG = shared Secret
+    lB = await B.multiply(lBigInt)
+    lBBytes = lB.toRawBytes()
     
-    sharedSecretBytes = ed255.getSharedSecret(nBytes, BBytes)
-
-    sharedSecretHex = tbut.bytesToHex(sharedSecretBytes) 
+    sharedSecretHex = tbut.bytesToHex(lBBytes) 
     referencePointHex = tbut.bytesToHex(ABytes)
     return { referencePointHex, sharedSecretHex }
 
-export referencedSharedSecretHashHex = referencedSharedSecretHash
-export referencedSharedSecretRawHex = referencedSharedSecretRaw
+export elGamalSecretHashHex = elGamalSecretHash
+export elGamalSecretRawHex = elGamalSecretRaw
 
 ############################################################
 # Bytes Versions
 
 ############################################################
-export createSharedSecretHashBytes = (secretKeyBytes, publicKeyBytes, contextString = "") ->
-    # n = SecretKey
-    # A = referencePoint = nG
-    # B = publicKey = lG
-    # nB = shared Secret = nlG
-    nBytes = secretKeyBytes
-    BBytes = publicKeyBytes
-    
-    nBBytes = ed255.getSharedSecret(nBytes, BBytes)
-
+export diffieHellmanSecretHashBytes = (secretKeyBytes, publicKeyBytes, contextString = "") ->
+    # a = our SecretKey
+    # k = sha512(a) -> hashToScalar (scalar for multiplication)
+    # B = lG = target User Public Key
+    # kB = klG = shared Secret
+    BHex = tbut.bytesToHex(publicKeyBytes)
+    B = ed255.ExtendedPoint.fromHex(BHex)
+    # k 
+    kBigInt = hashToScalar(sha512Bytes(secretKeyBytes))
+    # kB = klG = shared Secret
+    kB = await B.multiply(kBigInt)
+    kBBytes = kB.toRawBytes()
     cBytes = tbut.utf8ToBytes(contextString)
-    seedBytes = Buffer.concat([nBBytes, cBytes])
+    
+    seedBytes = new Uint8Array(kBBytes.length + cBytes.length)
+    for b,i in kBBytes
+        seedBytes[i] = b
+    for b,i in cBytes
+        seedBytes[kBBytes.length + i] = b
 
     sharedSecretBytes = sha512Bytes(seedBytes)
-
     return sharedSecretBytes
 
-export createSharedSecretRawBytes = (secretKeyBytes, publicKeyBytes) ->
-    # n = SecretKey
-    # A = referencePoint = nG
-    # B = publicKey = lG
-    # nB = shared Secret = nlG
-    nBytes = secretKeyBytes
-    BBytes = publicKeyBytes
-    
-    sharedSecretBytes = ed255.getSharedSecret(nBytes, BBytes)
-
-    return sharedSecretBytes
+export diffieHellmanSecretRawBytes = (secretKeyBytes, publicKeyBytes) ->
+    # a = our SecretKey
+    # k = sha512(a) -> hashToScalar (scalar for multiplication)
+    # B = lG = target User Public Key
+    # kB = klG = shared Secret
+    BHex = tbut.bytesToHex(publicKeyBytes)
+    B = ed255.ExtendedPoint.fromHex(BHex)
+    # k 
+    kBigInt = hashToScalar(sha512Bytes(secretKeyBytes))
+    # kB = klG = shared Secret
+    kB = await B.multiply(kBigInt)
+    kBBytes = kB.toRawBytes()
+    return kBBytes
 
 ############################################################
-export referencedSharedSecretHashBytes = (publicKeyBytes, contextString = "") ->
-    # n = SecretKey
-    # A = referencePoint = nG
-    # B = publicKey = lG
-    # nB = shared Secret = nlG
+export elGamalSecretHashBytes = (publicKeyBytes, contextString = "") ->
+    # a = Secret Key of target user
+    # k = sha512(a) -> hashToScalar (scalar for multiplication)
+    # G = basePoint
+    # B = kG = Public Key
+    BHex = tbut.bytesToHex(publicKeyBytes)
+    B = ed255.ExtendedPoint.fromHex(BHex)
+
+    # n = new one-time secret (generated forgotten about)
+    # l = sha512(n) -> hashToScalar (scalar for multiplication)
+    # A = lG = one time public key = reference point
+    # lB = lkG = shared secret
+    # key = sha512(lB)
+    # X = symmetricEncrypt(content, key)
+    # {A,X} = data for targt user
+
+    # n = one-time secret -> l
     nBytes = ed255.utils.randomPrivateKey()
+    lBigInt = hashToScalar(sha512Bytes(nBytes))
     
-    BBytes = publicKeyBytes
+    # A reference Point
     ABytes = await ed255.getPublicKeyAsync(nBytes)
-    
-    nBBytes = ed255.getSharedSecret(nBytes, BBytes)
+    # lB = lkG = shared Secret
+    lB = await B.multiply(lBigInt)
+    lBBytes = lB.toRawBytes()
 
     cBytes = tbut.utf8ToBytes(contextString)
-    seedBytes = Buffer.concat([nBBytes, cBytes])
 
+    seedBytes = new Uint8Array(lBBytes.length + cBytes.length)
+    for b,i in lBBytes
+        seedBytes[i] = b
+    for b,i in cBytes
+        seedBytes[lBBytes.length + i] = b
+    
     sharedSecretBytes = sha512Bytes(seedBytes)
-
     referencePointBytes = ABytes
     return { referencePointBytes, sharedSecretBytes }
 
-export referencedSharedSecretRawBytes = (publicKeyBytes) ->
-    # n = SecretKey
-    # A = referencePoint = nG
-    # B = publicKey = lG
-    # nB = shared Secret = nlG
-    nBytes = ed255.utils.randomPrivateKey()
+export elGamalSecretRawBytes = (publicKeyBytes) ->
+    # a = Secret Key of target user
+    # k = sha512(a) -> hashToScalar (scalar for multiplication)
+    # G = basePoint
+    # B = kG = Public Key
+    BHex = tbut.bytesToHex(publicKeyBytes)
+    B = ed255.ExtendedPoint.fromHex(BHex)
     
-    BBytes = publicKeyBytes
-    ABytes = await ed255.getPublicKeyAsync(nBytes)
-    
-    sharedSecretBytes = ed255.getSharedSecret(nBytes, BBytes)
+    # n = new one-time secret (generated forgotten about)
+    # l = sha512(n) -> hashToScalar (scalar for multiplication)
+    # A = lG = one time public key = reference point
+    # lB = lkG = shared secret
+    # key = sha512(lB)
+    # X = symmetricEncrypt(content, key)
+    # {A,X} = data for targt user
 
+    # n = one-time secret -> l
+    nBytes = ed255.utils.randomPrivateKey()
+    lBigInt = hashToScalar(sha512Bytes(nBytes))
+    
+    # A reference Point
+    ABytes = await ed255.getPublicKeyAsync(nBytes)
+    # lB = lkG = shared Secret
+    lB = await B.multiply(lBigInt)
+    lBBytes = lB.toRawBytes()
+
+    sharedSecretBytes = lBBytes
     referencePointBytes = ABytes
     return { referencePointBytes, sharedSecretBytes }
 
