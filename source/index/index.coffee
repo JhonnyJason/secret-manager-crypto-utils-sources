@@ -101,25 +101,29 @@ export createPublicKeyBytes = (secretKeyBytes) -> await ed255.getPublicKeyAsync(
 ############################################################
 # Hex Version
 export createSignature = (content, signingKeyHex) ->
-    hashHex = sha256Hex(content)
-    signature = await ed255.signAsync(hashHex, signingKeyHex)
+    contentBytes = tbut.utf8ToBytes(content)
+    signingKeyBytes = tbut.hexToBytes(signingKeyHex)
+    signature = await ed255.signAsync(contentBytes, signingKeyBytes)
     return tbut.bytesToHex(signature)
 
 export verify = (sigHex, keyHex, content) ->
-    hashHex = sha256Hex(content)
-    return await ed255.verifyAsync(sigHex, hashHex, keyHex)
+    sigBytes = tbut.hexToBytes(sigHex)
+    keyBytes = tbut.hexToBytes(keyHex)
+    contentBytes = tbut.utf8ToBytes(content)
+    return await ed255.verifyAsync(sigBytes, contentBytes, keyBytes)
 
 export createSignatureHex = createSignature
 export verifyHex = verify 
 ############################################################
 # Byte Version
 export createSignatureBytes = (content, signingKeyBytes) ->
-    hashBytes = sha256Bytes(content)
-    return await ed255.signAsync(hashBytes, signingKeyBytes)
+    contentBytes = tbut.utf8ToBytes(content)
+    return await ed255.signAsync(contentBytes, signingKeyBytes)
 
 export verifyBytes = (sigBytes, keyBytes, content) ->
-    hashBytes = sha256Bytes(content)
-    return await ed255.verifyAsync(sigBytes, hashBytes, keyBytes)
+    contentBytes = tbut.utf8ToBytes(content)
+    return await ed255.verifyAsync(sigBytes, contentBytes, keyBytes)
+
 
 #endregion
 
@@ -189,8 +193,6 @@ export symmetricEncryptBytes = (content, keyBytes) ->
     for b,i in gibbrishFinal
         allGibbrish[gibbrish.length + i] = b
     return allGibbrish
-    # allGibbrish = Buffer.concat([gibbrish,gibbrishFinal])
-    # return new Uint8Array(allGibbrish)
 
 export symmetricDecryptBytes = (gibbrishBytes, keyBytes) ->
     ivBuffer = Buffer.from(keyBytes.buffer, 0, 16)
@@ -208,47 +210,6 @@ export symmetricDecryptBytes = (gibbrishBytes, keyBytes) ->
         allSaltedContent[saltedContent.length + i] = b
     return unsaltContent(allSaltedContent)
     
-#endregion
-
-############################################################
-#region Unsalted symmetric encryption
-
-############################################################
-# Hex Version
-export symmetricEncryptUnsalted = (content, keyHex) ->
-    ivHex = keyHex.substring(0, 32)
-    ivBuffer = Buffer.from(ivHex, "hex")
-    aesKeyHex = keyHex.substring(32,96)
-    aesKeyBuffer = Buffer.from(aesKeyHex, "hex")
-    # console.log "- - ivHex: "
-    # console.log ivHex
-    # console.log ivHex.length
-    # console.log "- - aesKeyHex: "
-    # console.log aesKeyHex
-    # console.log aesKeyHex.length
-
-    cipher = crypto.createCipheriv(encAlgo, aesKeyBuffer, ivBuffer)
-    gibbrish = cipher.update(content, 'utf8', 'hex')
-    gibbrish += cipher.final('hex')
-    return gibbrish
-
-export symmetricDecryptUnsalted = (gibbrishHex, keyHex) ->
-    ivHex = keyHex.substring(0, 32)
-    ivBuffer = Buffer.from(ivHex, "hex")
-    aesKeyHex = keyHex.substring(32,96)
-    aesKeyBuffer = Buffer.from(aesKeyHex, "hex")
-    # console.log "- - ivHex: "
-    # console.log ivHex
-    # console.log ivHex.length
-    # console.log "- - aesKeyHex: "
-    # console.log aesKeyHex
-    # console.log aesKeyHex.length
-
-    decipher = crypto.createDecipheriv(encAlgo, aesKeyBuffer, ivBuffer)
-    content = decipher.update(gibbrishHex, 'hex', 'utf8')
-    content += decipher.final('utf8')
-    return content
-
 #endregion
 
 ############################################################
@@ -279,7 +240,7 @@ export asymmetricEncrypt = (content, publicKeyHex) ->
     # A reference Point
     ABytes = await ed255.getPublicKeyAsync(nBytes)
     # lB = lkG = shared Secret
-    lB = await B.multiply(lBigInt)
+    lB = B.multiply(lBigInt)
     
     # encrypt with symmetricEncryptHex
     symkeyHex = sha512Hex(lB.toRawBytes())    
@@ -307,7 +268,7 @@ export asymmetricDecrypt = (secrets, secretKeyHex) ->
     # key = sha512(kAHex)
     # content = symmetricDecrypt(X, key)
     A = ed255.ExtendedPoint.fromHex(AHex)
-    kA = await A.multiply(kBigInt)
+    kA = A.multiply(kBigInt)
 
     symkeyHex = sha512Hex(kA.toRawBytes())
     content = symmetricDecryptHex(gibbrishHex,symkeyHex)
@@ -342,7 +303,7 @@ export asymmetricEncryptBytes = (content, publicKeyBytes) ->
     # A reference Point
     ABytes = await ed255.getPublicKeyAsync(nBytes)
     # lB = lkG = shared Secret
-    lB = await B.multiply(lBigInt)
+    lB = B.multiply(lBigInt)
 
     symkeyBytes = sha512Bytes(lB.toRawBytes())
     gibbrishBytes = symmetricEncryptBytes(content, symkeyBytes)
@@ -369,7 +330,7 @@ export asymmetricDecryptBytes = (secrets, secretKeyBytes) ->
     # content = symmetricDecrypt(X, key)
     AHex = tbut.bytesToHex(ABytes)
     A = ed255.ExtendedPoint.fromHex(AHex)
-    kA = await A.multiply(kBigInt)
+    kA = A.multiply(kBigInt)
 
     symkeyBytes = sha512Bytes(kA.toRawBytes())
     content = symmetricDecryptBytes(gibbrishBytes, symkeyBytes)
@@ -378,7 +339,7 @@ export asymmetricDecryptBytes = (secrets, secretKeyBytes) ->
 #endregion
 
 ############################################################
-#region referenced/shared secrets
+#region deffieHellman/ElGamal secrets
 
 ############################################################
 # Hex Versions
@@ -448,7 +409,7 @@ export elGamalSecretHash = (publicKeyHex, contextString = "") ->
     # A reference Point
     ABytes = await ed255.getPublicKeyAsync(nBytes)
     # lB = lkG = shared Secret
-    lB = await B.multiply(lBigInt)
+    lB = B.multiply(lBigInt)
     lBBytes = lB.toRawBytes()
 
     cBytes = tbut.utf8ToBytes(contextString)
@@ -485,7 +446,7 @@ export elGamalSecretRaw = (publicKeyHex) ->
     # A reference Point
     ABytes = await ed255.getPublicKeyAsync(nBytes)
     # lB = lkG = shared Secret
-    lB = await B.multiply(lBigInt)
+    lB = B.multiply(lBigInt)
     lBBytes = lB.toRawBytes()
     
     sharedSecretHex = tbut.bytesToHex(lBBytes) 
@@ -509,7 +470,7 @@ export diffieHellmanSecretHashBytes = (secretKeyBytes, publicKeyBytes, contextSt
     # k 
     kBigInt = hashToScalar(sha512Bytes(secretKeyBytes))
     # kB = klG = shared Secret
-    kB = await B.multiply(kBigInt)
+    kB = B.multiply(kBigInt)
     kBBytes = kB.toRawBytes()
     cBytes = tbut.utf8ToBytes(contextString)
     
@@ -532,7 +493,7 @@ export diffieHellmanSecretRawBytes = (secretKeyBytes, publicKeyBytes) ->
     # k 
     kBigInt = hashToScalar(sha512Bytes(secretKeyBytes))
     # kB = klG = shared Secret
-    kB = await B.multiply(kBigInt)
+    kB = B.multiply(kBigInt)
     kBBytes = kB.toRawBytes()
     return kBBytes
 
@@ -560,7 +521,7 @@ export elGamalSecretHashBytes = (publicKeyBytes, contextString = "") ->
     # A reference Point
     ABytes = await ed255.getPublicKeyAsync(nBytes)
     # lB = lkG = shared Secret
-    lB = await B.multiply(lBigInt)
+    lB = B.multiply(lBigInt)
     lBBytes = lB.toRawBytes()
 
     cBytes = tbut.utf8ToBytes(contextString)
@@ -598,7 +559,7 @@ export elGamalSecretRawBytes = (publicKeyBytes) ->
     # A reference Point
     ABytes = await ed255.getPublicKeyAsync(nBytes)
     # lB = lkG = shared Secret
-    lB = await B.multiply(lBigInt)
+    lB = B.multiply(lBigInt)
     lBBytes = lB.toRawBytes()
 
     sharedSecretBytes = lBBytes

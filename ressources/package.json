@@ -1,7 +1,7 @@
 {
     "name": "secret-manager-crypto-utils",
     "version": "0.3.0",
-    "description": "Small set of crypto utilities - ed25519 signatures and curve25519 el-gamal encrpytion with AES-256-CBC.",
+    "description": "Small set of crypto utilities - ed25519 signatures and el-gamal encrpytion with AES-256-CBC.",
     "main": "index.js",
     "browser": "browser.js",
     "scripts": {
