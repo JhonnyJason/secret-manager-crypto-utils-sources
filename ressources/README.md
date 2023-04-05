@@ -182,7 +182,7 @@ These changes mean that **you cannot decrypt any secrets encrypted with an earli
 When dealing with old encrypted secrets - better use the the old packages like this
 
 ```sh
-npm install secret-manager-crypto-utils-old@npm:secret-manager-crypto-utils@0.2.1
+npm install secret-manager-crypto-utils-old@npm:secret-manager-crypto-utils@0.2.0
 ```
 
 ## Hex FTW
@@ -198,7 +198,7 @@ The result of this kind of encryption is always an Object like:
 ```json
 {
     "referencePoint":"...",  // StringHex 
-    "encryptedContents":"...",  // StringHex 
+    "encryptedContent":"...",  // StringHex 
 }
 ```
 
@@ -206,9 +206,9 @@ The symmetric encryption uses `aes-256-cbc`.
 
 ### Potential AES-CBC Weaknesses
 There are some potential weaknesses in CBC Mode.
-- Padding Oracle Attacks
-- Bit Flipping
-- IV Reuse
+- [Padding Oracle Attacks](https://robertheaton.com/2013/07/29/padding-oracle-attack/)
+- [Bit Flipping](https://crypto.stackexchange.com/questions/66085/bit-flipping-attack-on-cbc-mode)
+- [predictable IV](https://stackoverflow.com/questions/3008139/why-is-using-a-non-random-iv-with-cbc-mode-a-vulnerability)
 
 While for most cases GCM is recommended to use, the CBC Mode just tastes better.
 
