@@ -8,12 +8,12 @@ This is:
 - sha256
 - sha512
 - Sign/Verify via Ed25519
-- Asymmetric Encrypt/Decrypt in ElGamal style using Curve25519
+- Asymmetric Encrypt/Decrypt in ElGamal style using the Twisted Edwards Curve
 - Symmetric Encrypt/Decrypt with [`salted`](#salt-envelope) AES-256-CBC
-- SharedSecret in Raw and Hashed version as privA * pubB = privB * pubA
-- ReferencedSharedSecret - using a random PrivA and adding the referencePoint pubA - in Raw and Hashed version
+- DiffieHellman style sharedSecret as `privA * pubB = privB * pubA` in Raw and Hashed version 
+- ElGamal style sharedSecret using an ephemeral random `privA` and providing the referencePoint `pubA` in Raw and Hashed version
 
-This is directly used from other parts of the [Secret Management](https://hackmd.io/PZjpRfzPSBCqS-8K54x2jA?view) system.
+This is directly used by other parts of the [Secret Management](https://hackmd.io/PZjpRfzPSBCqS-8K54x2jA?view) system.
 
 ## Usage
 Current Functionality
