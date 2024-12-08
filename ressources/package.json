@@ -1,7 +1,7 @@
 {
     "name": "secret-manager-crypto-utils",
-    "version": "0.3.0",
-    "description": "Small set of crypto utilities - ed25519 signatures and el-gamal encrpytion with AES-256-CBC.",
+    "version": "0.3.1",
+    "description": "Small set of crypto utilities - ed25519 signatures, el-gamal encrpytion with AES-256-CBC, diffie-hellman and elGamal Secret sharing.",
     "main": "index.js",
     "browser": "browser.js",
     "scripts": {
@@ -19,10 +19,11 @@
         "crypto",
         "secret-manager",
         "utility",
+        "diffie-hellman",
         "el-gamal"
     ],
     "author": "Lenard Frommelt lenard@frommelt.dev",
-    "license": "Unlicense",
+    "license": "CC0",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/JhonnyJason/secret-manager-crypto-utils.git"
@@ -32,7 +33,7 @@
     },
     "homepage": "https://github.com/JhonnyJason/secret-manager-crypto-utils-output#readme",
     "dependencies": {
-        "@noble/ed25519": "^2.0.0",
+        "@noble/ed25519": "^2.1.0",
         "thingy-byte-utils": "0.0.8"
     },
     "type": "module"

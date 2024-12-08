@@ -1,19 +1,21 @@
 # secret-manager-crypto-utils 
 
 ## Background
-For the specific usecases in the edeavor to get a reasonable [Secret Management](https://hackmd.io/PZjpRfzPSBCqS-8K54x2jA) we do not need too many features such that it made sense to specifically craft this small convenience library for the small required functionality.
+Starting with the [Secret Management](https://hackmd.io/PZjpRfzPSBCqS-8K54x2jA) the requirement of a set of specific cryptographic functions arose. 
+This evolved to a neat cryptographic backbone based on Curve25519, AES and SHA-2.
+Usable the Backend and the Frontend.
 
-This is:
-
+It is:
 - sha256
 - sha512
 - Sign/Verify via Ed25519
 - Asymmetric Encrypt/Decrypt in ElGamal style using the Twisted Edwards Curve
 - Symmetric Encrypt/Decrypt with [`salted`](#salt-envelope) AES-256-CBC
-- DiffieHellman style sharedSecret as `privA * pubB = privB * pubA` in Raw and Hashed version 
+- DiffieHellman style sharedSecret as `privA * pubB = privB * pubA` in Raw and Hashed version
 - ElGamal style sharedSecret using an ephemeral random `privA` and providing the referencePoint `pubA` in Raw and Hashed version
 
-This is directly used by other parts of the [Secret Management](https://hackmd.io/PZjpRfzPSBCqS-8K54x2jA?view) system.
+
+There ia a convenience package around this - the [Thingy-Crypto-Node](https://www.npmjs.com/package/thingy-crypto-node)
 
 ## Usage
 Current Functionality
@@ -113,40 +115,66 @@ await secUtl.asymmetricDecryptBytes( Object { referencePointBytes, encryptedCont
 await secUtl.asymmetricDecryptBytes( Object { Uint8Array, Uint8Array }, Uint8Array ) -> String
 
 
-## shared secret - hashed
-# secUtl.diffieHellmanSecretHash is secUtl.diffieHellmanSecretHashHex
+## Diffie Hellman shared secret - hashed
+# secUtl.diffieHellmanSecretHash is also:
+##    secUtl.diffieHellmanSecretHashHex
+##    secUtl.sharedSecretHash
+##    secUtl.sharedSecretHashHex
 await secUtl.diffieHellmanSecretHashHex( secretKeyHex, publicKeyHex, context )
 await secUtl.diffieHellmanSecretHashHex( StringHex, StringHex, String ) -> StringHex
 
+# secUtl.diffieHellmanSecretHashBytes is also:
+##    secUtl.sharedSecretHashBytes
 await secUtl.diffieHellmanSecretHashBytes( secretKeyBytes, publicKeyBytes, context )
 await secUtl.diffieHellmanSecretHashBytes( Uint8Array, Uint8Array, String ) -> Uint8Array
 
 
-## shared secret - raw
-# secUtl.diffieHellmanSecretHash is secUtl.diffieHellmanSecretHashHex
+## Diffie Hellman shared secret - raw
+# secUtl.diffieHellmanSecretRaw is also:
+##    secUtl.diffieHellmanSecretRawHex
+##    secUtl.sharedSecretRaw
+##    secUtl.sharedSecretRawHex
 await secUtl.diffieHellmanSecretRawHex( secretKeyHex, publicKeyHex)
 await secUtl.diffieHellmanSecretRawHex( StringHex, StringHex ) -> StringHex
 
+# secUtl.diffieHellmanSecretRawBytes is also:
+##    secUtl.sharedSecretRawBytes
 await secUtl.diffieHellmanSecretRawBytes( secretKeyBytes, publicKeyBytes)
 await secUtl.diffieHellmanSecretRawBytes( Uint8Array, Uint8Array ) -> Uint8Array
 
 
-## referenced secret - hashed
-# secUtl.elGamalSecretHash is secUtl.elGamalSecretHashHex
+## elGamal referenced secret - hashed
+# secUtl.elGamalSecretHash is also: 
+##    secUtl.elGamalSecretHashHex
+##    secUtl.referencedSecretHashHex
+##    secUtl.referencedSecretHash
+##    secUtl.referencedSharedSecretHashHex
+##    secUtl.referencedSharedSecretHash
 await secUtl.elGamalSecretHashHex( secretKeyHex, publicKeyHex, context )
 await secUtl.elGamalSecretHashHex( StringHex, StringHex, String ) -> Object { referencePointHex, sharedSecretHex}
 await secUtl.elGamalSecretHashHex( StringHex, StringHex, String ) -> Object { StringHex, StringHex}
 
+# secUtl.elGamalSecretHashBytes is also: 
+##    secUtl.referencedSecretHashBytes
+##    secUtl.referencedSharedSecretHashBytes
 await secUtl.elGamalSecretHashBytes( secretKeyBytes, publicKeyBytes, context )
 await secUtl.elGamalSecretHashBytes( Uint8Array, Uint8Array, String ) -> Object { referencePointBytes, sharedSecretBytes }
 await secUtl.elGamalSecretHashBytes( Uint8Array, Uint8Array, String ) -> Object { Uint8Array, Uint8Array }
 
-## referenced secret - raw
-# secUtl.elGamalSecretRaw is secUtl.elGamalSecretRawHex
+## elGamal referenced secret - raw
+# secUtl.elGamalSecretRaw is also:
+##    secUtl.elGamalSecretRawHex
+##    secUtl.referencedSecretRaw
+##    secUtl.referencedSecretRawHex
+##    secUtl.referencedSharedSecretRaw
+##    secUtl.referencedSharedSecretRawHex
 await secUtl.elGamalSecretRawHex( secretKeyHex, publicKeyHex )
 await secUtl.elGamalSecretRawHex( StringHex, StringHex ) -> Object { referencePointHex, sharedSecretHex}
 await secUtl.elGamalSecretRawHex( StringHex, StringHex ) -> Object { StringHex, StringHex}
 
+# secUtl.elGamalSecretRawBytes is also:
+##    secUtl.referencedSecretRawBytes
+##    secUtl.referencedSharedSecretRawBytes
 await secUtl.elGamalSecretRawBytes( secretKeyBytes, publicKeyBytes)
 await secUtl.elGamalSecretRawBytes( Uint8Array, Uint8Array) -> Object { referencePointBytes, sharedSecretBytes }
 await secUtl.elGamalSecretRawBytes( Uint8Array, Uint8Array) -> Object { Uint8Array, Uint8Array }
@@ -303,4 +331,4 @@ All sorts of inputs are welcome, thanks!
 
 
 # License
-[Unlicense JhonnyJason style](https://hackmd.io/nCpLO3gxRlSmKVG3Zxy2hA?view)
+[CCO](https://creativecommons.org/publicdomain/zero/1.0/)
