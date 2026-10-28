@@ -15,8 +15,13 @@ const hexToBytes = (hex) => {
     return tbut.hexToBytes(hex)
 }
 
+const checkBytes = (bytes) => {
+    if (!(bytes instanceof Uint8Array)) throw new TypeError("Expected a Uint8Array!")
+}
+
 // a shorter key would silently become AES-128/192 or fail late inside WebCrypto
 const checkSymKey = (keyBytes) => {
+    checkBytes(keyBytes)
     if (!(keyBytes?.length >= 48)) throw new RangeError("Symmetric key must have at least 48 bytes!")
 }
 
@@ -35,10 +40,10 @@ const concat = (a, b) => {
     return result
 }
 
-// small-order points give a shared secret everybody knows
+// small-order points give a shared secret everybody knows, a torsion component leaks k mod 8
 const publicPoint = (publicKeyBytes) => {
     const P = ed.Point.fromBytes(publicKeyBytes)
-    if (P.isSmallOrder()) throw new RangeError("Invalid public key!")
+    if (P.isSmallOrder() || !P.isTorsionFree()) throw new RangeError("Invalid public key!")
     return P
 }
 
@@ -69,14 +74,14 @@ export const createKeyPairBytes = async () => {
     const publicKeyBytes = await ed.getPublicKeyAsync(secretKeyBytes)
     return { secretKeyBytes, publicKeyBytes }
 }
-export const createSymKeyBytes = () => randomBytes(48)
+export const createSymKeyBytes = async () => randomBytes(48)
 export const createPublicKeyBytes = (secretKeyBytes) => ed.getPublicKeyAsync(secretKeyBytes)
 
 export const createKeyPairHex = async () => {
     const { secretKeyBytes, publicKeyBytes } = await createKeyPairBytes()
     return { secretKeyHex: tbut.bytesToHex(secretKeyBytes), publicKeyHex: tbut.bytesToHex(publicKeyBytes) }
 }
-export const createSymKeyHex = () => tbut.bytesToHex(createSymKeyBytes())
+export const createSymKeyHex = async () => tbut.bytesToHex(await createSymKeyBytes())
 export const createPublicKeyHex = async (secretKeyHex) => tbut.bytesToHex(await createPublicKeyBytes(hexToBytes(secretKeyHex)))
 export const createKeyPair = createKeyPairHex
 export const createSymKey = createSymKeyHex
@@ -122,6 +127,7 @@ export const symmetricEncryptBytes = async (content, keyBytes) => {
 // v1 when the tag verifies, else legacy CBC (1/256 of legacy ciphertexts start with 0x01 too)
 export const symmetricDecryptBytes = async (gibbrishBytes, keyBytes) => {
     checkSymKey(keyBytes)
+    checkBytes(gibbrishBytes)
     if (gibbrishBytes[0] == V1 && gibbrishBytes.length >= V1_MIN_LENGTH) {
         try { return await decryptV1(gibbrishBytes, keyBytes) } catch { }
     }
@@ -164,10 +170,11 @@ export const symmetricDecryptHex = (gibbrishHex, keyHex) => symmetricDecryptByte
 export const symmetricEncrypt = symmetricEncryptHex
 export const symmetricDecrypt = symmetricDecryptHex
 
-// PBKDF2-SHA256 -> 48 byte symmetric key, for low-entropy inputs (passwords, PINs) only
+// PBKDF2-SHA256 -> 48 byte symmetric key, for passwords only
 // NFC: the same password typed on different platforms may arrive in different unicode forms
 export const deriveSymKeyFromPassword = async (password, saltHex = tbut.bytesToHex(randomBytes(16)), iterations = 600000) => {
-    if (!Number.isInteger(iterations) || iterations < 1) throw new RangeError("Iterations must be a positive integer!")
+    // below 1k is no protection, above 10M an accidental DoS
+    if (!Number.isInteger(iterations) || iterations < 1000 || iterations > 10000000) throw new RangeError("Iterations must be an integer in 1000..10000000!")
     const salt = hexToBytes(saltHex)
     if (salt.length < 16) throw new RangeError("Salt must have at least 16 bytes!")
     const baseKey = await subtle.importKey("raw", utf8(password.normalize("NFC")), "PBKDF2", false, ["deriveBits"])

@@ -12,8 +12,8 @@ export declare function createKeyPairHex(): Promise<{ secretKeyHex: string, publ
 export declare function createKeyPairBytes(): Promise<{ secretKeyBytes: Uint8Array, publicKeyBytes: Uint8Array }>
 export declare function createPublicKeyHex(secretKeyHex: string): Promise<string>
 export declare function createPublicKeyBytes(secretKeyBytes: Uint8Array): Promise<Uint8Array>
-export declare function createSymKeyHex(): string
-export declare function createSymKeyBytes(): Uint8Array
+export declare function createSymKeyHex(): Promise<string>
+export declare function createSymKeyBytes(): Promise<Uint8Array>
 export declare const createKeyPair: typeof createKeyPairHex
 export declare const createPublicKey: typeof createPublicKeyHex
 export declare const createSymKey: typeof createSymKeyHex
@@ -36,7 +36,7 @@ export declare function symmetricDecryptBytes(gibbrishBytes: Uint8Array, keyByte
 export declare const symmetricEncrypt: typeof symmetricEncryptHex
 export declare const symmetricDecrypt: typeof symmetricDecryptHex
 
-/** PBKDF2-SHA256 -> 48 byte key. For passwords and PINs only. saltHex: >= 16 bytes, random by default. */
+/** PBKDF2-SHA256 -> 48 byte key. For passwords only. saltHex: >= 16 bytes, random by default. iterations: 1000..10000000. */
 export declare function deriveSymKeyFromPassword(password: string, saltHex?: string, iterations?: number): Promise<{ keyHex: string, saltHex: string, iterations: number }>
 
 //############################################################
