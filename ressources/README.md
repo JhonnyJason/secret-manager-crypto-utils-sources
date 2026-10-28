@@ -3,191 +3,117 @@
 ## Background
 Starting with the [Secret Management](https://hackmd.io/PZjpRfzPSBCqS-8K54x2jA) the requirement of a set of specific cryptographic functions arose. 
 This evolved to a neat cryptographic backbone based on Curve25519, AES and SHA-2.
-Usable the Backend and the Frontend.
+Usable in the backend and the frontend.
 
 It is:
 - sha256
 - sha512
 - Sign/Verify via Ed25519
 - Asymmetric Encrypt/Decrypt in ElGamal style using the Twisted Edwards Curve
-- Symmetric Encrypt/Decrypt with [`salted`](#salt-envelope) AES-256-CBC
+- Symmetric Encrypt/Decrypt with AES-256-GCM ([format v1](#symmetric-format-v1)), still decrypting [legacy](#legacy-v03x-ciphertext) AES-256-CBC
+- Password based key derivation (PBKDF2-SHA256)
 - DiffieHellman style sharedSecret as `privA * pubB = privB * pubA` in Raw and Hashed version
 - ElGamal style sharedSecret using an ephemeral random `privA` and providing the referencePoint `pubA` in Raw and Hashed version
 
 
-There ia a convenience package around this - the [Thingy-Crypto-Node](https://www.npmjs.com/package/thingy-crypto-node)
+There is a convenience package around this - the [Thingy-Crypto-Node](https://www.npmjs.com/package/thingy-crypto-node)
 
 ## Usage
-Current Functionality
----------------------
+One implementation on WebCrypto for node (>= 20), deno, bun, browsers and workers. Every function returns a Promise, except `createSymKey*`.
 
-```coffee
-import *  as secUtl from "secret-manager-crypto-utils"
+```js
+import * as secUtl from "secret-manager-crypto-utils"
 
-## shas
-# secUtl.sha256 is secUtl.sha256Hex 
-await secUtl.sha256Hex( String ) -> StringHex
+const { secretKeyHex, publicKeyHex } = await secUtl.createKeyPair()
+const sig = await secUtl.createSignature("hello", secretKeyHex)
+await secUtl.verify(sig, publicKeyHex, "hello") // true
 
-await secUtl.sha256Bytes( String ) -> Uint8Array | Buffer
+const secrets = await secUtl.asymmetricEncrypt("my secret", publicKeyHex)
+await secUtl.asymmetricDecrypt(secrets, secretKeyHex) // "my secret"
 
-
-# secUtl.sha512 is secUtl.sha512Hex
-await secUtl.sha512Hex( String ) -> StringHex
-
-await secUtl.sha512Bytes( String ) -> Uint8Array | Buffer
-
-
-## keys
-# secUtl.createKeyPair is secUtl.createKeyPairHex
-await secUtl.createKeyPairHex() -> Object { secretKeyHex, publicKeyHex }
-await secUtl.createKeyPairHex() -> Object { StringHex, StringHex }
-
-await secUtl.createKeyPairBytes() -> Object { secretKeyBytes, publicKeyBytes }
-await secUtl.createKeyPairBytes() -> Object { Uint8Array, Uint8Array }
-
-
-# secUtl.publicKey is secUtl.publicKeyHex
-await secUtl.publicKeyHex( secretKeyHex ) -> publicKeyHex
-await secUtl.publicKeyHex( StringHex ) -> StringHex
-
-await secUtl.publicKeyBytes( secretKeyBytes ) -> publicKeyBytes
-await secUtl.publicKeyBytes( Uint8Array ) -> Uint8Array
-
-
-#secUtl.createSymKey = secUtl.createSymKeyHex
-secUtl.createSymKeyHex() -> StringHex 
-
-secUtl.createSymKeyBytes() -> Uint8Array
-
-
-## signatures
-# secUtl.createSignature is secUtl.createSignatureHex
-await secUtl.createSignatureHex( content, secretKey )
-await secUtl.createSignatureHex( String, StringHex ) -> StringHex
-
-await secUtl.createSignatureBytes( content, secretKey )
-await secUtl.createSignatureHex( String, Uint8Array ) -> Uint8Array
-
-
-# secUtl.verify is secUtl.verifyHex
-await secUtl.verifyHex( signature, publicKey, content )
-await secUtl.verifyHex(StringHex, StringHex, String) -> Boolean
-
-await secUtl.verifyBytes( signature, publicKey, content )
-await secUtl.verifyHex( Uint8Array, Uint8Array, String) -> Boolean
-
-
-## encryption - symmetric
-# secUtl.symmetricEncrypt is secUtl.symmetricEncryptHex
-await secUtl.symmetricEncryptHex( content, symKey )
-await secUtl.symmetricEncryptHex( String, StringHex ) -> StringHex
-
-await secUtl.symmetricEncryptBytes( content, symKey )
-await secUtl.symmetricEncryptBytes( String, Uint8Array ) -> Uint8Array
-
-
-# secUtl.symmetricDecrypt is secUtl.symmetricDecryptHex
-await secUtl.symmetricDecryptHex( encryptedContent, symKey )
-await secUtl.symmetricDecryptHex( StringHex, StringHex ) -> String
-
-await secUtl.symmetricDecryptBytes( encryptedContent, symKey )
-await secUtl.symmetricDecryptBytes( Uint8Array, Uint8Array ) -> String
-
-
-
-## encryption - asymmetric
-# secUtl.asymmetricEncrypt is secUtl.asymmetricEncryptHex
-await secUtl.asymmetricEncryptHex( content, publicKey )
-await secUtl.asymmetricEncryptHex( String, StringHex ) -> Object { referencePointHex, encryptetContentsHex }
-await secUtl.asymmetricEncryptHex( String, StringHex ) -> Object { StringHex, StringHex}
-
-await secUtl.asymmetricEncryptBytes( content, publicKey )
-await secUtl.asymmetricEncryptBytes( String, Uint8Array ) -> Object { referencePointBytes, encryptedContentsBytes }
-await secUtl.asymmetricEncryptBytes( String, Uint8Array ) -> Object { Uint8Array, Uint8Array }
-
-# secUtl.asymmetricDecrypt is secUtl.asymmetricDecryptHex
-await secUtl.asymmetricDecryptHex( secretsObject, secretKey )
-await secUtl.asymmetricDecryptHex( Object { referencePointHex, encryptedContentsHex }, StringHex }, StringHex ) -> String
-await secUtl.asymmetricDecryptHex( Object { StringHex, StringHex }, StringHex }, StringHex ) -> String
-
-await secUtl.asymmetricDecryptBytes( secretsObject, secretKey )
-await secUtl.asymmetricDecryptBytes( Object { referencePointBytes, encryptedContentsBytes }, Uint8Array ) -> String
-await secUtl.asymmetricDecryptBytes( Object { Uint8Array, Uint8Array }, Uint8Array ) -> String
-
-
-## Diffie Hellman shared secret - hashed
-# secUtl.diffieHellmanSecretHash is also:
-##    secUtl.diffieHellmanSecretHashHex
-##    secUtl.sharedSecretHash
-##    secUtl.sharedSecretHashHex
-await secUtl.diffieHellmanSecretHashHex( secretKeyHex, publicKeyHex, context )
-await secUtl.diffieHellmanSecretHashHex( StringHex, StringHex, String ) -> StringHex
-
-# secUtl.diffieHellmanSecretHashBytes is also:
-##    secUtl.sharedSecretHashBytes
-await secUtl.diffieHellmanSecretHashBytes( secretKeyBytes, publicKeyBytes, context )
-await secUtl.diffieHellmanSecretHashBytes( Uint8Array, Uint8Array, String ) -> Uint8Array
-
-
-## Diffie Hellman shared secret - raw
-# secUtl.diffieHellmanSecretRaw is also:
-##    secUtl.diffieHellmanSecretRawHex
-##    secUtl.sharedSecretRaw
-##    secUtl.sharedSecretRawHex
-await secUtl.diffieHellmanSecretRawHex( secretKeyHex, publicKeyHex)
-await secUtl.diffieHellmanSecretRawHex( StringHex, StringHex ) -> StringHex
-
-# secUtl.diffieHellmanSecretRawBytes is also:
-##    secUtl.sharedSecretRawBytes
-await secUtl.diffieHellmanSecretRawBytes( secretKeyBytes, publicKeyBytes)
-await secUtl.diffieHellmanSecretRawBytes( Uint8Array, Uint8Array ) -> Uint8Array
-
-
-## elGamal referenced secret - hashed
-# secUtl.elGamalSecretHash is also: 
-##    secUtl.elGamalSecretHashHex
-##    secUtl.referencedSecretHashHex
-##    secUtl.referencedSecretHash
-##    secUtl.referencedSharedSecretHashHex
-##    secUtl.referencedSharedSecretHash
-await secUtl.elGamalSecretHashHex( secretKeyHex, publicKeyHex, context )
-await secUtl.elGamalSecretHashHex( StringHex, StringHex, String ) -> Object { referencePointHex, sharedSecretHex}
-await secUtl.elGamalSecretHashHex( StringHex, StringHex, String ) -> Object { StringHex, StringHex}
-
-# secUtl.elGamalSecretHashBytes is also: 
-##    secUtl.referencedSecretHashBytes
-##    secUtl.referencedSharedSecretHashBytes
-await secUtl.elGamalSecretHashBytes( secretKeyBytes, publicKeyBytes, context )
-await secUtl.elGamalSecretHashBytes( Uint8Array, Uint8Array, String ) -> Object { referencePointBytes, sharedSecretBytes }
-await secUtl.elGamalSecretHashBytes( Uint8Array, Uint8Array, String ) -> Object { Uint8Array, Uint8Array }
-
-## elGamal referenced secret - raw
-# secUtl.elGamalSecretRaw is also:
-##    secUtl.elGamalSecretRawHex
-##    secUtl.referencedSecretRaw
-##    secUtl.referencedSecretRawHex
-##    secUtl.referencedSharedSecretRaw
-##    secUtl.referencedSharedSecretRawHex
-await secUtl.elGamalSecretRawHex( secretKeyHex, publicKeyHex )
-await secUtl.elGamalSecretRawHex( StringHex, StringHex ) -> Object { referencePointHex, sharedSecretHex}
-await secUtl.elGamalSecretRawHex( StringHex, StringHex ) -> Object { StringHex, StringHex}
-
-# secUtl.elGamalSecretRawBytes is also:
-##    secUtl.referencedSecretRawBytes
-##    secUtl.referencedSharedSecretRawBytes
-await secUtl.elGamalSecretRawBytes( secretKeyBytes, publicKeyBytes)
-await secUtl.elGamalSecretRawBytes( Uint8Array, Uint8Array) -> Object { referencePointBytes, sharedSecretBytes }
-await secUtl.elGamalSecretRawBytes( Uint8Array, Uint8Array) -> Object { Uint8Array, Uint8Array }
-
-
-## salts
-secUtl.saltContent(String) -> Uint8Array
-secUtl.unsaltContent( Uint8Array ) -> String
-
+const keyHex = secUtl.createSymKey()
+const gibbrish = await secUtl.symmetricEncrypt("my secret", keyHex)
+await secUtl.symmetricDecrypt(gibbrish, keyHex) // "my secret"
 ```
 
+Every function exists as `…Hex` (hex strings in and out) and `…Bytes` (`Uint8Array` in and out). The name without suffix is the Hex variant. Content is always a `string`.
+
+```js
+// shas - content: string or Uint8Array
+sha256Hex(content) -> hex                     // alias sha256
+sha512Hex(content) -> hex                     // alias sha512
+sha256Bytes(content) -> Uint8Array
+sha512Bytes(content) -> Uint8Array
+
+// keys
+createKeyPairHex() -> { secretKeyHex, publicKeyHex }          // alias createKeyPair
+createKeyPairBytes() -> { secretKeyBytes, publicKeyBytes }
+createPublicKeyHex(secretKeyHex) -> publicKeyHex              // alias createPublicKey
+createPublicKeyBytes(secretKeyBytes) -> publicKeyBytes
+createSymKeyHex() -> hex          // sync, 48 bytes            // alias createSymKey
+createSymKeyBytes() -> Uint8Array // sync, 48 bytes
+
+// signatures (ed25519, strict RFC 8032)
+createSignatureHex(content, secretKeyHex) -> sigHex           // alias createSignature
+createSignatureBytes(content, secretKeyBytes) -> sigBytes
+verifyHex(sigHex, publicKeyHex, content) -> boolean           // alias verify
+verifyBytes(sigBytes, publicKeyBytes, content) -> boolean
+
+// symmetric encryption (AES-256-GCM, format v1) - key: >= 48 bytes
+symmetricEncryptHex(content, keyHex) -> gibbrishHex           // alias symmetricEncrypt
+symmetricEncryptBytes(content, keyBytes) -> gibbrishBytes
+symmetricDecryptHex(gibbrishHex, keyHex) -> content           // alias symmetricDecrypt
+symmetricDecryptBytes(gibbrishBytes, keyBytes) -> content
+
+// password based key derivation - low-entropy inputs (passwords, PINs) only
+// store saltHex and iterations next to the ciphertext, they are needed to derive the same key again
+deriveSymKeyFromPassword(password, saltHex = random 16 bytes, iterations = 600000) -> { keyHex, saltHex, iterations }
+
+// asymmetric encryption (ElGamal style)
+asymmetricEncryptHex(content, publicKeyHex) -> { referencePointHex, encryptedContentHex }      // alias asymmetricEncrypt
+asymmetricEncryptBytes(content, publicKeyBytes) -> { referencePointBytes, encryptedContentBytes }
+asymmetricDecryptHex(secrets, secretKeyHex) -> content        // alias asymmetricDecrypt
+asymmetricDecryptBytes(secrets, secretKeyBytes) -> content
+// decrypt also accepts { referencePoint, encryptedContent }
+
+// Diffie-Hellman shared secret: ours secretKey * their publicKey
+diffieHellmanSecretRawHex(secretKeyHex, publicKeyHex) -> hex (32 bytes)
+diffieHellmanSecretRawBytes(secretKeyBytes, publicKeyBytes) -> Uint8Array
+diffieHellmanSecretHashHex(secretKeyHex, publicKeyHex, context = "") -> hex (64 bytes)
+diffieHellmanSecretHashBytes(secretKeyBytes, publicKeyBytes, context = "") -> Uint8Array
+
+// ElGamal shared secret: ephemeral secretKey * their publicKey, referencePoint = ephemeral publicKey
+elGamalSecretRawHex(publicKeyHex) -> { referencePointHex, sharedSecretHex }
+elGamalSecretRawBytes(publicKeyBytes) -> { referencePointBytes, sharedSecretBytes }
+elGamalSecretHashHex(publicKeyHex, context = "") -> { referencePointHex, sharedSecretHex }
+elGamalSecretHashBytes(publicKeyBytes, context = "") -> { referencePointBytes, sharedSecretBytes }
+```
+
+Errors: invalid hex → `SyntaxError`; content that is not a well-formed string → `TypeError`; wrong key lengths, small-order public keys, short KDF salt → `RangeError`; any decryption failure → `Error("Decryption failed!")`.
+
+### Aliases (kept for compatibility)
+| canonical | aliases |
+|---|---|
+| `diffieHellmanSecretRawHex` | `diffieHellmanSecretRaw`, `createSharedSecretRaw`, `createSharedSecretRawHex` |
+| `diffieHellmanSecretRawBytes` | `sharedSecretRawBytes` |
+| `diffieHellmanSecretHashHex` | `diffieHellmanSecretHash`, `createSharedSecretHash`, `createSharedSecretHashHex` |
+| `diffieHellmanSecretHashBytes` | `sharedSecretHashBytes` |
+| `elGamalSecretRawHex` | `elGamalSecretRaw`, `referencedSecretRaw(Hex)`, `referencedSharedSecretRaw(Hex)` |
+| `elGamalSecretRawBytes` | `referencedSecretRawBytes`, `referencedSharedSecretRawBytes` |
+| `elGamalSecretHashHex` | `elGamalSecretHash`, `referencedSecretHash(Hex)`, `referencedSharedSecretHash(Hex)` |
+| `elGamalSecretHashBytes` | `referencedSecretHashBytes`, `referencedSharedSecretHashBytes` |
 
 ## Breaking Updates
+`0.3.x` -> `0.4.y`
+------------------
+- `symmetricEncrypt` writes [format v1](#symmetric-format-v1) (AES-256-GCM). Decryption still reads v0.3.x ciphertext, but **v0.3.x cannot decrypt v1** - update readers before writers.
+- `sha256`/`sha512` are async on node too (they always were in the browser).
+- `saltContent`/`unsaltContent` are removed.
+- ed25519 secret keys must be exactly 32 bytes, symmetric keys at least 48 bytes, signatures 64 bytes.
+- Small-order public keys are rejected everywhere, and `verify` is strict RFC 8032 (no ZIP-215).
+- Strings with lone surrogates (`"a\uD800"`) throw instead of being silently changed to `"a\uFFFD"`.
+- Node >= 20.
+
 `0.2.x` -> `0.3.y`
 ------------------
 Since `v0.3.0` we have fixed some security concerns rooting from unauthenticated and unpadded use of AES-CBC.
@@ -214,41 +140,49 @@ npm install secret-manager-crypto-utils-old@npm:secret-manager-crypto-utils@0.2.
 ```
 
 ## Hex FTW
-It is adivsable  that you stare all encrypted contents, signatures and keys in hex strings. This appears to be the most superior way of how to universally transfer byte information.
+It is advisable that you store all encrypted contents, signatures and keys in hex strings. This appears to be the most superior way of how to universally transfer byte information.
 
-The big wins of hex in readability and processability beats out the "downside" of being 2x the size. Also the performance loss is in most cases neglible ~ < 10%.
+The big wins of hex in readability and processability beats out the "downside" of being 2x the size. Also the performance loss is in most cases negligible ~ < 10%.
 
 
 ## Encryption
-For the encryption functionality we use ed25519 keys for producing El-Gamal-style shared secret-keys which we then use for symmetrically encrypting the contents.
+For the asymmetric encryption we use ed25519 keys for producing El-Gamal-style shared secret-keys (`sha512` of the shared point) which we then use for symmetrically encrypting the contents.
 
 The result of this kind of encryption is always an Object like:
 ```json
 {
-    "referencePoint":"...",  // StringHex 
-    "encryptedContent":"...",  // StringHex 
+    "referencePointHex":"...",  // StringHex
+    "encryptedContentHex":"...",  // StringHex
 }
 ```
 
-The symmetric encryption uses `aes-256-cbc`.
+### Symmetric format v1
+```
+0x01 ‖ nonce(12) ‖ AES-256-GCM( padLen(1) ‖ utf8(content) ‖ random(padLen) ) ‖ tag(16)
+```
+- The AES key is bytes 16..47 of the symmetric key (48 bytes from `createSymKey`, or the 64 byte `sha512` on the asymmetric path). Bytes 0..15 were the legacy CBC IV and are not used by v1.
+- The nonce is 12 random bytes per message, never a parameter. With random nonces, keep it to about 2^32 messages per key.
+- The tag is 128 bits. WebCrypto verifies it before releasing any plaintext, so a single flipped bit makes decryption fail.
+- `padLen` is random 0-255 and hides the exact content length (to within 256 bytes). It is inside the authenticated data.
+- Every failure is one generic `Error("Decryption failed!")`, which never says why.
 
-### Potential AES-CBC Weaknesses
-There are some potential weaknesses in CBC Mode.
-- [Padding Oracle Attacks](https://robertheaton.com/2013/07/29/padding-oracle-attack/)
-- [Bit Flipping](https://crypto.stackexchange.com/questions/66085/bit-flipping-attack-on-cbc-mode)
-- [predictable IV](https://stackoverflow.com/questions/3008139/why-is-using-a-non-random-iv-with-cbc-mode-a-vulnerability)
+### Legacy v0.3.x ciphertext
+Decryption tries v1 when the first byte is `0x01` and the GCM tag verifies, otherwise it falls back to the old AES-256-CBC + [salt envelope](#salt-envelope) (1/256 of old ciphertexts also start with `0x01`, so the tag decides, not the version byte).
 
-While for most cases GCM is recommended to use, the CBC Mode just tastes better.
+Residual risks of this fallback, accepted until all old secrets are re-encrypted:
+- CBC has no real integrity check. A tampered v1 ciphertext falls through to CBC and, with tiny probability (valid PKCS#7 padding *and* a valid salt envelope), returns garbage instead of throwing.
+- Success or failure and the timing difference between the padding check and the salt check could act as a padding oracle on **old** ciphertexts if a service decrypts attacker-controlled input and reports the result. Do not expose decryption of untrusted input as a service, and re-encrypt old secrets (decrypt + encrypt writes v1).
 
-One part of the solution is our new salt-envelope introduced on `v0.3.0`. It is a padded verifiable envelope of our plaintext consisting of random bytes. 
-If any bit is flipped we should see that this envelope has become invalid.
-
-Also generally we donot provide any oracle. Most of these potential attacks rely on an oracle. Because an attacker could try to flip muliple bits in an attempt to cover up the manipulation. If we provide an oracle which could quickly tell the attacker that the message was still valid or not then there is some surface of an attack.
-
-For our purpose what we encrypt are well-kept secrets with unique keys and unique IVs. Only to be accessed sporadically by the consumer. A Service guarantees uncorrupted storage of these secrets - preferrably signing the stored data which makes it tamper-proof at that level anyways. If the consumer receives a corrupted secret this means the service has been corrupted and the recovery scenario would not look like requesting the secret over and over again until decryption is achieved.
-
+### Security notes
+- **Not key-committing.** AES-GCM does not bind the ciphertext to one key: a crafted ciphertext can decrypt successfully under two different keys ("invisible salamanders"). Don't use decryption success as proof of *which* key was used.
+- **No key binding on the asymmetric path.** The symmetric key is `sha512(shared point)` and does not include the referencePoint or the recipient key (kept for v0.3.x compatibility). Asymmetric encryption is not authenticated: anyone with the public key can encrypt, so sign the content if the sender matters.
+- **Small-order points** (identity and the 7 torsion points) give a shared secret everybody knows. They are rejected as public keys and reference points.
+- **Strict signatures.** `verify` follows RFC 8032 with canonical encodings (no ZIP-215), so one signature cannot verify every message under a small-order key, and signatures are not malleable.
+- **Passwords:** `deriveSymKeyFromPassword` is PBKDF2-SHA256, 600000 iterations by default, with a random 16 byte salt (shorter salts throw). Passwords are NFC-normalized, so the same password typed on different platforms gives the same key. Random keys belong to `createSymKey`, not the KDF.
 
 ## Salt Envelope
+*Legacy (v0.3.x), only read by decryption now.*
+
 We random length prefix of random bytes to obsucate where potentially known plaintext could be.
 
 Also we also add a padding postfix, so never have a "virtually predictable" ending. 
@@ -279,46 +213,36 @@ We may apply 2 different styles:
 ### DiffieHellman Secrets
 Imagine Alice has the keyPair `privA, pubA` and Bob `privB, pubB`
 
-The Shared Secrets work in this way:
-```coffee
-aliceSharedSecret = await secUtl.diffieHellmanSecretRaw(privA, pubB) # 32 bytes HexString
-bobSharedSecret = await secUtl.diffieHellmanSecretRaw(privB, pubA)
-(aliceSharedSecret == bobSharedSecret) # true
-
+```js
+const aliceSharedSecret = await secUtl.diffieHellmanSecretRaw(privA, pubB) // 32 bytes hex
+const bobSharedSecret = await secUtl.diffieHellmanSecretRaw(privB, pubA)
+aliceSharedSecret == bobSharedSecret // true
 ```
 
 With the hashed version you may add an arbitrary context. This allows you to generate different sharedSecrets from the same key-pairs.
-```coffee
-context = "onetime-context@"+Date.now()
-aliceSharedSecret = await secUtl.diffieHellmanSecretHash(privA, pubB, context) # 64 bytes HexString
-bobSharedSecret = await secUtl.diffieHellmanSecretHash(privB, pubA, context)
-(aliceSharedSecret == bobSharedSecret) # true
-
-``` 
-
-### ElGamal Secrets
-ElGamal style is relevant for Alice - using any random ephemeral key instead of `privA`.
-Bob would use the `diffiHellmanSecret` functions for blending with the `referencePoint`.
-
-```coffee
-elGamalSecret = await secUtl.elGamalSecretRaw(pubB) # Object {referencePointHex, sharedSecretHex} 
-referencePoint = elGamalSecret.referencePointHex # 32 bytes Hex String
-aliceSharedSecret = elGamalSecret.sharedSecretHex  # 32 bytes Hex String
-bobSharedSecret = await secUtl.diffieHellmanSecretRaw(privB, referencePointHex)
-(aliceSharedSecret == bobSharedSecret) # true
-
+```js
+const context = "onetime-context@" + Date.now()
+const aliceSharedSecret = await secUtl.diffieHellmanSecretHash(privA, pubB, context) // 64 bytes hex
+const bobSharedSecret = await secUtl.diffieHellmanSecretHash(privB, pubA, context)
+aliceSharedSecret == bobSharedSecret // true
 ```
 
+### ElGamal Secrets
+ElGamal style is relevant for Alice - using a random ephemeral key instead of `privA`.
+Bob uses the `diffieHellmanSecret` functions with the `referencePoint`.
 
-```coffee
-context = "onetime-context@"+Date.now()
-elGamalSecret = await secUtl.elGamalSecretHash(pubB, context) # Object {referencePointHex, sharedSecretHex}
-referencePoint = elGamalSecret.referencePointHex # 32 bytes Hex String
-aliceSharedSecret = elGamalSecret.sharedSecretHex  # 64 bytes Hex String
-bobSharedSecret = await secUtl.diffieHellmanSecretHash(privB, referencePointHex, context)
-(aliceSharedSecret == bobSharedSecret) # true
+```js
+const { referencePointHex, sharedSecretHex } = await secUtl.elGamalSecretRaw(pubB) // 32 bytes hex each
+const bobSharedSecret = await secUtl.diffieHellmanSecretRaw(privB, referencePointHex)
+sharedSecretHex == bobSharedSecret // true
+```
 
-``` 
+```js
+const context = "onetime-context@" + Date.now()
+const { referencePointHex, sharedSecretHex } = await secUtl.elGamalSecretHash(pubB, context) // 64 bytes hex secret
+const bobSharedSecret = await secUtl.diffieHellmanSecretHash(privB, referencePointHex, context)
+sharedSecretHex == bobSharedSecret // true
+```
 
 ## Noble ed25519
 All of this is straight forward based on [noble-ed25519](https://github.com/paulmillr/noble-ed25519). A very concise and modern package for freely using the ed25519 algorithms. Big thanks for that!
