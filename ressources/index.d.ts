@@ -28,12 +28,12 @@ export declare const createSignature: typeof createSignatureHex
 export declare const verifySignature: typeof verifySignatureHex
 
 //############################################################
-/** AES-256-GCM format v1. Key: >= 48 bytes. */
-export declare function symmetricEncryptHex(content: string, keyHex: string): Promise<string>
-export declare function symmetricEncryptBytes(content: string, keyBytes: Uint8Array): Promise<Uint8Array>
-/** Reads format v1 and legacy v0.3.x. Throws Error("Decryption failed!"). */
-export declare function symmetricDecryptHex(gibbrishHex: string, keyHex: string): Promise<string>
-export declare function symmetricDecryptBytes(gibbrishBytes: Uint8Array, keyBytes: Uint8Array): Promise<string>
+/** AES-256-GCM format v1. Key: >= 48 bytes. context: authenticated, not transmitted - decrypt needs the same one. */
+export declare function symmetricEncryptHex(content: string, keyHex: string, context?: string): Promise<string>
+export declare function symmetricEncryptBytes(content: string, keyBytes: Uint8Array, context?: string): Promise<Uint8Array>
+/** Reads format v1 and (without context only) legacy v0.3.x. Throws Error("Decryption failed!"). */
+export declare function symmetricDecryptHex(gibbrishHex: string, keyHex: string, context?: string): Promise<string>
+export declare function symmetricDecryptBytes(gibbrishBytes: Uint8Array, keyBytes: Uint8Array, context?: string): Promise<string>
 export declare const symmetricEncrypt: typeof symmetricEncryptHex
 export declare const symmetricDecrypt: typeof symmetricDecryptHex
 
@@ -44,10 +44,10 @@ export declare function deriveSymKeyFromPassword(password: string, saltHex?: str
 export interface SecretsHex { referencePointHex: string, encryptedContentHex: string }
 export interface SecretsBytes { referencePointBytes: Uint8Array, encryptedContentBytes: Uint8Array }
 
-export declare function asymmetricEncryptHex(content: string, publicKeyHex: string): Promise<SecretsHex>
-export declare function asymmetricEncryptBytes(content: string, publicKeyBytes: Uint8Array): Promise<SecretsBytes>
-export declare function asymmetricDecryptHex(secrets: SecretsHex | { referencePoint: string, encryptedContent: string }, secretKeyHex: string): Promise<string>
-export declare function asymmetricDecryptBytes(secrets: SecretsBytes | { referencePoint: Uint8Array, encryptedContent: Uint8Array }, secretKeyBytes: Uint8Array): Promise<string>
+export declare function asymmetricEncryptHex(content: string, publicKeyHex: string, context?: string): Promise<SecretsHex>
+export declare function asymmetricEncryptBytes(content: string, publicKeyBytes: Uint8Array, context?: string): Promise<SecretsBytes>
+export declare function asymmetricDecryptHex(secrets: SecretsHex | { referencePoint: string, encryptedContent: string }, secretKeyHex: string, context?: string): Promise<string>
+export declare function asymmetricDecryptBytes(secrets: SecretsBytes | { referencePoint: Uint8Array, encryptedContent: Uint8Array }, secretKeyBytes: Uint8Array, context?: string): Promise<string>
 export declare const asymmetricEncrypt: typeof asymmetricEncryptHex
 export declare const asymmetricDecrypt: typeof asymmetricDecryptHex
 

@@ -113,18 +113,20 @@ export const verifySignature = verifySignatureHex
 //############################################################
 //#region symmetric encryption
 // format v1: 0x01 ‖ nonce(12) ‖ AES-256-GCM( padLen(1) ‖ content ‖ random(padLen) ) ‖ tag(16)
+// context: GCM additionalData, not transmitted - decrypt needs the same one; "" gives the same output as none
 // key: 48 bytes, v1 uses bytes 16..47 as AES key (bytes 0..15 were the legacy CBC iv)
 // subarray respects the byteOffset of views
 const V1 = 0x01
 const NONCE_LENGTH = 12
 const V1_MIN_LENGTH = 1 + NONCE_LENGTH + 16 + 1 // version, nonce, tag, padLen
 
-export const symmetricEncryptBytes = async (content, keyBytes) => {
+export const symmetricEncryptBytes = async (content, keyBytes, context = "") => {
     checkSymKey(keyBytes)
     const key = await importAesGcmKey(keyBytes.subarray(16, 48))
     // random nonce per message, never a parameter: a reuse under one key breaks GCM
     const nonce = randomBytes(NONCE_LENGTH)
-    const sealed = await subtle.encrypt({ name: "AES-GCM", iv: nonce, tagLength: 128 }, key, padContent(content))
+    const params = { name: "AES-GCM", iv: nonce, tagLength: 128, additionalData: utf8(context) }
+    const sealed = await subtle.encrypt(params, key, padContent(content))
     const result = new Uint8Array(1 + NONCE_LENGTH + sealed.byteLength)
     result[0] = V1
     result.set(nonce, 1)
@@ -133,21 +135,24 @@ export const symmetricEncryptBytes = async (content, keyBytes) => {
 }
 
 // v1 when the tag verifies, else legacy CBC (1/256 of legacy ciphertexts start with 0x01 too)
-export const symmetricDecryptBytes = async (gibbrishBytes, keyBytes) => {
+export const symmetricDecryptBytes = async (gibbrishBytes, keyBytes, context = "") => {
     checkSymKey(keyBytes)
     checkBytes(gibbrishBytes)
+    const additionalData = utf8(context)
     if (gibbrishBytes[0] == V1 && gibbrishBytes.length >= V1_MIN_LENGTH) {
-        try { return await decryptV1(gibbrishBytes, keyBytes) } catch { }
+        try { return await decryptV1(gibbrishBytes, keyBytes, additionalData) } catch { }
     }
-    try { return await decryptLegacy(gibbrishBytes, keyBytes) } catch { }
+    // legacy CBC cannot check a context, so a caller asking for one must not get legacy plaintext
+    if (context === "") try { return await decryptLegacy(gibbrishBytes, keyBytes) } catch { }
     throw new Error("Decryption failed!")
 }
 
-const decryptV1 = async (gibbrishBytes, keyBytes) => {
+const decryptV1 = async (gibbrishBytes, keyBytes, additionalData) => {
     const key = await importAesGcmKey(keyBytes.subarray(16, 48))
     const nonce = gibbrishBytes.subarray(1, 1 + NONCE_LENGTH)
     // WebCrypto verifies the tag before releasing any plaintext
-    const padded = await subtle.decrypt({ name: "AES-GCM", iv: nonce, tagLength: 128 }, key, gibbrishBytes.subarray(1 + NONCE_LENGTH))
+    const params = { name: "AES-GCM", iv: nonce, tagLength: 128, additionalData }
+    const padded = await subtle.decrypt(params, key, gibbrishBytes.subarray(1 + NONCE_LENGTH))
     return unpadContent(new Uint8Array(padded))
 }
 
@@ -173,8 +178,8 @@ const unpadContent = (paddedBytes) => {
     return tbut.bytesToUtf8(paddedBytes.subarray(1, end))
 }
 
-export const symmetricEncryptHex = async (content, keyHex) => tbut.bytesToHex(await symmetricEncryptBytes(content, hexToBytes(keyHex)))
-export const symmetricDecryptHex = (gibbrishHex, keyHex) => symmetricDecryptBytes(hexToBytes(gibbrishHex), hexToBytes(keyHex))
+export const symmetricEncryptHex = async (content, keyHex, context) => tbut.bytesToHex(await symmetricEncryptBytes(content, hexToBytes(keyHex), context))
+export const symmetricDecryptHex = (gibbrishHex, keyHex, context) => symmetricDecryptBytes(hexToBytes(gibbrishHex), hexToBytes(keyHex), context)
 export const symmetricEncrypt = symmetricEncryptHex
 export const symmetricDecrypt = symmetricDecryptHex
 
@@ -196,31 +201,31 @@ export const deriveSymKeyFromPassword = async (password, saltHex = tbut.bytesToH
 //############################################################
 //#region asymmetric encryption
 // ElGamal style: A = lG is sent along, lB = kA is the shared secret, sha512(lB) the symmetric key
-export const asymmetricEncryptBytes = async (content, publicKeyBytes) => {
+export const asymmetricEncryptBytes = async (content, publicKeyBytes, context = "") => {
     const { referencePointBytes, sharedSecretBytes } = await elGamalSecretRawBytes(publicKeyBytes)
-    const encryptedContentBytes = await symmetricEncryptBytes(content, await sha512Bytes(sharedSecretBytes))
+    const encryptedContentBytes = await symmetricEncryptBytes(content, await sha512Bytes(sharedSecretBytes), context)
     return { referencePointBytes, encryptedContentBytes }
 }
 
-export const asymmetricDecryptBytes = async (secrets, secretKeyBytes) => {
+export const asymmetricDecryptBytes = async (secrets, secretKeyBytes, context = "") => {
     const ABytes = secrets.referencePointBytes || secrets.referencePoint
     const gibbrishBytes = secrets.encryptedContentBytes || secrets.encryptedContent
     if (ABytes == null || gibbrishBytes == null) throw new Error("Invalid secrets Object!")
     const kABytes = await diffieHellmanSecretRawBytes(secretKeyBytes, ABytes)
-    return symmetricDecryptBytes(gibbrishBytes, await sha512Bytes(kABytes))
+    return symmetricDecryptBytes(gibbrishBytes, await sha512Bytes(kABytes), context)
 }
 
-export const asymmetricEncryptHex = async (content, publicKeyHex) => {
-    const { referencePointBytes, encryptedContentBytes } = await asymmetricEncryptBytes(content, hexToBytes(publicKeyHex))
+export const asymmetricEncryptHex = async (content, publicKeyHex, context) => {
+    const { referencePointBytes, encryptedContentBytes } = await asymmetricEncryptBytes(content, hexToBytes(publicKeyHex), context)
     return { referencePointHex: tbut.bytesToHex(referencePointBytes), encryptedContentHex: tbut.bytesToHex(encryptedContentBytes) }
 }
 
-export const asymmetricDecryptHex = (secrets, secretKeyHex) => {
+export const asymmetricDecryptHex = (secrets, secretKeyHex, context) => {
     const AHex = secrets.referencePointHex || secrets.referencePoint
     const gibbrishHex = secrets.encryptedContentHex || secrets.encryptedContent
     if (AHex == null || gibbrishHex == null) throw new Error("Invalid secrets Object!")
     const secretsBytes = { referencePointBytes: hexToBytes(AHex), encryptedContentBytes: hexToBytes(gibbrishHex) }
-    return asymmetricDecryptBytes(secretsBytes, hexToBytes(secretKeyHex))
+    return asymmetricDecryptBytes(secretsBytes, hexToBytes(secretKeyHex), context)
 }
 export const asymmetricEncrypt = asymmetricEncryptHex
 export const asymmetricDecrypt = asymmetricDecryptHex
