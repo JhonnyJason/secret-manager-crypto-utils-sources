@@ -92,13 +92,21 @@ export const createPublicKey = createPublicKeyHex
 //############################################################
 //#region signatures
 export const createSignatureBytes = async (content, signingKeyBytes) => ed.signAsync(utf8(content), signingKeyBytes)
+// undefined when valid, else an error string - never throws, and a missing await is truthy so it fails closed
 // strict RFC 8032: zip215 accepts small-order keys for which one signature verifies any message
-export const verifyBytes = async (sigBytes, keyBytes, content) => ed.verifyAsync(sigBytes, utf8(content), keyBytes, { zip215: false })
+export const verifySignatureBytes = async (sigBytes, keyBytes, content) => {
+    try {
+        if (await ed.verifyAsync(sigBytes, utf8(content), keyBytes, { zip215: false })) return undefined
+        return "Invalid signature!"
+    } catch { return "Malformed input!" }
+}
 
 export const createSignatureHex = async (content, signingKeyHex) => tbut.bytesToHex(await createSignatureBytes(content, hexToBytes(signingKeyHex)))
-export const verifyHex = (sigHex, keyHex, content) => verifyBytes(hexToBytes(sigHex), hexToBytes(keyHex), content)
+export const verifySignatureHex = async (sigHex, keyHex, content) => {
+    try { return await verifySignatureBytes(hexToBytes(sigHex), hexToBytes(keyHex), content) } catch { return "Malformed input!" }
+}
 export const createSignature = createSignatureHex
-export const verify = verifyHex
+export const verifySignature = verifySignatureHex
 
 //#endregion
 

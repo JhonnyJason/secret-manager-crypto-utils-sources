@@ -21,10 +21,11 @@ export declare const createSymKey: typeof createSymKeyHex
 //############################################################
 export declare function createSignatureHex(content: string, secretKeyHex: string): Promise<string>
 export declare function createSignatureBytes(content: string, secretKeyBytes: Uint8Array): Promise<Uint8Array>
-export declare function verifyHex(sigHex: string, publicKeyHex: string, content: string): Promise<boolean>
-export declare function verifyBytes(sigBytes: Uint8Array, publicKeyBytes: Uint8Array, content: string): Promise<boolean>
+/** Resolves undefined when the signature is valid, else an error string. Never rejects. */
+export declare function verifySignatureHex(sigHex: string, publicKeyHex: string, content: string): Promise<string | undefined>
+export declare function verifySignatureBytes(sigBytes: Uint8Array, publicKeyBytes: Uint8Array, content: string): Promise<string | undefined>
 export declare const createSignature: typeof createSignatureHex
-export declare const verify: typeof verifyHex
+export declare const verifySignature: typeof verifySignatureHex
 
 //############################################################
 /** AES-256-GCM format v1. Key: >= 48 bytes. */
