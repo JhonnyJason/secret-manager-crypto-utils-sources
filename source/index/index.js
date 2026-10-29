@@ -31,6 +31,13 @@ const utf8 = (content) => {
     return tbut.utf8ToBytes(content)
 }
 
+// hex mode: a hex key gives hex results, a Uint8Array key gives Uint8Array results
+const isHex = (x) => typeof x == "string"
+const asBytes = (x) => isHex(x) ? hexToBytes(x) : x
+const asModeOf = (key, bytes) => isHex(key) ? tbut.bytesToHex(bytes) : bytes
+// { fooBytes } -> { fooHex }
+const asModeOfObject = (key, result) => isHex(key) ? Object.fromEntries(Object.entries(result).map(([k, v]) => [k.replace(/Bytes$/, "Hex"), tbut.bytesToHex(v)])) : result
+
 const toBytes = (content) => (typeof content == "string") ? utf8(content) : content
 
 const concat = (a, b) => {
@@ -81,10 +88,8 @@ const importAesGcmKey = (keyBytes) => subtle.importKey("raw", keyBytes, { name: 
 export const sha256Bytes = async (content) => new Uint8Array(await subtle.digest("SHA-256", toBytes(content)))
 export const sha512Bytes = async (content) => new Uint8Array(await subtle.digest("SHA-512", toBytes(content)))
 
-export const sha256Hex = async (content) => tbut.bytesToHex(await sha256Bytes(content))
-export const sha512Hex = async (content) => tbut.bytesToHex(await sha512Bytes(content))
-export const sha256 = sha256Hex
-export const sha512 = sha512Hex
+export const sha256 = async (content) => tbut.bytesToHex(await sha256Bytes(content))
+export const sha512 = async (content) => tbut.bytesToHex(await sha512Bytes(content))
 
 //#endregion
 
@@ -96,23 +101,18 @@ export const createKeyPairBytes = async () => {
     return { secretKeyBytes, publicKeyBytes }
 }
 export const createSymKeyBytes = async () => randomBytes(48)
-export const createPublicKeyBytes = (secretKeyBytes) => ed.getPublicKeyAsync(secretKeyBytes)
+const createPublicKeyBytes = (secretKeyBytes) => ed.getPublicKeyAsync(secretKeyBytes)
 
-export const createKeyPairHex = async () => {
-    const { secretKeyBytes, publicKeyBytes } = await createKeyPairBytes()
-    return { secretKeyHex: tbut.bytesToHex(secretKeyBytes), publicKeyHex: tbut.bytesToHex(publicKeyBytes) }
-}
-export const createSymKeyHex = async () => tbut.bytesToHex(await createSymKeyBytes())
-export const createPublicKeyHex = async (secretKeyHex) => tbut.bytesToHex(await createPublicKeyBytes(hexToBytes(secretKeyHex)))
-export const createKeyPair = createKeyPairHex
-export const createSymKey = createSymKeyHex
-export const createPublicKey = createPublicKeyHex
+// no key to take the mode from: hex, with the …Bytes variants above
+export const createKeyPair = async () => asModeOfObject("", await createKeyPairBytes())
+export const createSymKey = async () => tbut.bytesToHex(await createSymKeyBytes())
+export const createPublicKey = async (secretKey) => asModeOf(secretKey, await createPublicKeyBytes(asBytes(secretKey)))
 
 //#endregion
 
 //############################################################
 //#region signatures
-export const createSignatureBytes = async (content, signingKeyBytes) => {
+const createSignatureBytes = async (content, signingKeyBytes) => {
     const message = utf8(content)
     checkSecretKey(signingKeyBytes)
     if (!nativeEd25519) return ed.signAsync(message, signingKeyBytes)
@@ -124,7 +124,7 @@ export const createSignatureBytes = async (content, signingKeyBytes) => {
 // strict RFC 8032, the same answer on every path: canonical A and R, S < L, cofactorless equation
 // A and R are decoded and small-order rejected here, as the WebCrypto spec demands - node does, bun/deno native don't
 // a small-order key would let one signature verify any message
-export const verifySignatureBytes = async (sigBytes, keyBytes, content) => {
+const verifySignatureBytes = async (sigBytes, keyBytes, content) => {
     try {
         const message = utf8(content)
         checkBytes(sigBytes)
@@ -151,12 +151,10 @@ const verifyFallback = async (sigBytes, keyBytes, A, R, message) => {
     return ed.Point.BASE.multiply(S, false).equals(R.add(A.multiply(k, false)))
 }
 
-export const createSignatureHex = async (content, signingKeyHex) => tbut.bytesToHex(await createSignatureBytes(content, hexToBytes(signingKeyHex)))
-export const verifySignatureHex = async (sigHex, keyHex, content) => {
-    try { return await verifySignatureBytes(hexToBytes(sigHex), hexToBytes(keyHex), content) } catch { return "Malformed input!" }
+export const createSignature = async (content, signingKey) => asModeOf(signingKey, await createSignatureBytes(content, asBytes(signingKey)))
+export const verifySignature = async (sig, key, content) => {
+    try { return await verifySignatureBytes(asBytes(sig), asBytes(key), content) } catch { return "Malformed input!" }
 }
-export const createSignature = createSignatureHex
-export const verifySignature = verifySignatureHex
 
 //#endregion
 
@@ -170,7 +168,7 @@ const V1 = 0x01
 const NONCE_LENGTH = 12
 const V1_MIN_LENGTH = 1 + NONCE_LENGTH + 16 + 1 // version, nonce, tag, padLen
 
-export const symmetricEncryptBytes = async (content, keyBytes, context = "") => {
+const symmetricEncryptBytes = async (content, keyBytes, context = "") => {
     checkSymKey(keyBytes)
     const key = await importAesGcmKey(keyBytes.subarray(16, 48))
     // random nonce per message, never a parameter: a reuse under one key breaks GCM
@@ -185,7 +183,7 @@ export const symmetricEncryptBytes = async (content, keyBytes, context = "") => 
 }
 
 // v1 when the tag verifies, else legacy CBC (1/256 of legacy ciphertexts start with 0x01 too)
-export const symmetricDecryptBytes = async (gibbrishBytes, keyBytes, context = "") => {
+const symmetricDecryptBytes = async (gibbrishBytes, keyBytes, context = "") => {
     checkSymKey(keyBytes)
     checkBytes(gibbrishBytes)
     const additionalData = utf8(context)
@@ -228,10 +226,8 @@ const unpadContent = (paddedBytes) => {
     return tbut.bytesToUtf8(paddedBytes.subarray(1, end))
 }
 
-export const symmetricEncryptHex = async (content, keyHex, context) => tbut.bytesToHex(await symmetricEncryptBytes(content, hexToBytes(keyHex), context))
-export const symmetricDecryptHex = (gibbrishHex, keyHex, context) => symmetricDecryptBytes(hexToBytes(gibbrishHex), hexToBytes(keyHex), context)
-export const symmetricEncrypt = symmetricEncryptHex
-export const symmetricDecrypt = symmetricDecryptHex
+export const symmetricEncrypt = async (content, key, context) => asModeOf(key, await symmetricEncryptBytes(content, asBytes(key), context))
+export const symmetricDecrypt = async (gibbrish, key, context) => symmetricDecryptBytes(asBytes(gibbrish), asBytes(key), context)
 
 // PBKDF2-SHA256 -> 48 byte symmetric key, for passwords only
 // NFC: the same password typed on different platforms may arrive in different unicode forms
@@ -252,35 +248,27 @@ export const deriveSymKeyFromPassword = async (password, saltHex = tbut.bytesToH
 //#region asymmetric encryption
 // ElGamal style: referencePoint A is sent along, DH(n, B) = DH(k, A) is the shared secret
 // symmetric key = sha512(shared ‖ A): A and -A give the same X25519 secret, A's exact bytes make the key differ
-export const asymmetricEncryptBytes = async (content, publicKeyBytes, context = "") => {
+const asymmetricEncryptBytes = async (content, publicKeyBytes, context = "") => {
     const { referencePointBytes, sharedSecretBytes } = await elGamalSecretRawBytes(publicKeyBytes)
     const keyBytes = await sha512Bytes(concat(sharedSecretBytes, referencePointBytes))
     const encryptedContentBytes = await symmetricEncryptBytes(content, keyBytes, context)
     return { referencePointBytes, encryptedContentBytes }
 }
 
-export const asymmetricDecryptBytes = async (secrets, secretKeyBytes, context = "") => {
-    const ABytes = secrets.referencePointBytes || secrets.referencePoint
-    const gibbrishBytes = secrets.encryptedContentBytes || secrets.encryptedContent
-    if (ABytes == null || gibbrishBytes == null) throw new Error("Invalid secrets Object!")
+const asymmetricDecryptBytes = async (ABytes, gibbrishBytes, secretKeyBytes, context = "") => {
     const kABytes = await diffieHellmanSecretRawBytes(secretKeyBytes, ABytes)
     return symmetricDecryptBytes(gibbrishBytes, await sha512Bytes(concat(kABytes, ABytes)), context)
 }
 
-export const asymmetricEncryptHex = async (content, publicKeyHex, context) => {
-    const { referencePointBytes, encryptedContentBytes } = await asymmetricEncryptBytes(content, hexToBytes(publicKeyHex), context)
-    return { referencePointHex: tbut.bytesToHex(referencePointBytes), encryptedContentHex: tbut.bytesToHex(encryptedContentBytes) }
-}
+export const asymmetricEncrypt = async (content, publicKey, context) => asModeOfObject(publicKey, await asymmetricEncryptBytes(content, asBytes(publicKey), context))
 
-export const asymmetricDecryptHex = (secrets, secretKeyHex, context) => {
-    const AHex = secrets.referencePointHex || secrets.referencePoint
-    const gibbrishHex = secrets.encryptedContentHex || secrets.encryptedContent
-    if (AHex == null || gibbrishHex == null) throw new Error("Invalid secrets Object!")
-    const secretsBytes = { referencePointBytes: hexToBytes(AHex), encryptedContentBytes: hexToBytes(gibbrishHex) }
-    return asymmetricDecryptBytes(secretsBytes, hexToBytes(secretKeyHex), context)
+// takes the …Hex, the …Bytes and the unsuffixed (pre v0.3) property names
+export const asymmetricDecrypt = async (secrets, secretKey, context) => {
+    const A = secrets.referencePointHex || secrets.referencePointBytes || secrets.referencePoint
+    const gibbrish = secrets.encryptedContentHex || secrets.encryptedContentBytes || secrets.encryptedContent
+    if (A == null || gibbrish == null) throw new Error("Invalid secrets Object!")
+    return asymmetricDecryptBytes(asBytes(A), asBytes(gibbrish), asBytes(secretKey), context)
 }
-export const asymmetricEncrypt = asymmetricEncryptHex
-export const asymmetricDecrypt = asymmetricDecryptHex
 
 //#endregion
 
@@ -288,7 +276,7 @@ export const asymmetricDecrypt = asymmetricDecryptHex
 //#region diffieHellman/ElGamal secrets
 // X25519: h = sha512(our secretKey)[0:32], B = their publicKey, shared secret = u(clamp(h)·B) - same as v0.1.0-0.2.0
 // clamping makes the scalar a multiple of 8, so a torsion component of B drops out
-export const diffieHellmanSecretRawBytes = async (secretKeyBytes, publicKeyBytes) => {
+const diffieHellmanSecretRawBytes = async (secretKeyBytes, publicKeyBytes) => {
     checkSecretKey(secretKeyBytes)
     const B = publicPoint(publicKeyBytes)
     const h = (await sha512Bytes(secretKeyBytes)).subarray(0, 32)
@@ -302,61 +290,29 @@ export const diffieHellmanSecretRawBytes = async (secretKeyBytes, publicKeyBytes
     return montgomeryU(B.clearCofactor().multiply((bytesToNumberLE(h) >> 3n) % L))
 }
 
-export const diffieHellmanSecretHashBytes = async (secretKeyBytes, publicKeyBytes, contextString = "") => {
+const diffieHellmanSecretHashBytes = async (secretKeyBytes, publicKeyBytes, contextString = "") => {
     const kBBytes = await diffieHellmanSecretRawBytes(secretKeyBytes, publicKeyBytes)
     return sha512Bytes(concat(kBBytes, utf8(contextString)))
 }
 
 // one-time secret key n, A = publicKey(n) = referencePoint, shared secret = DH(n, B)
-export const elGamalSecretRawBytes = async (publicKeyBytes) => {
+const elGamalSecretRawBytes = async (publicKeyBytes) => {
     const n = ed.utils.randomSecretKey()
     const sharedSecretBytes = await diffieHellmanSecretRawBytes(n, publicKeyBytes)
     return { referencePointBytes: await createPublicKeyBytes(n), sharedSecretBytes }
 }
 
-export const elGamalSecretHashBytes = async (publicKeyBytes, contextString = "") => {
+const elGamalSecretHashBytes = async (publicKeyBytes, contextString = "") => {
     const { referencePointBytes, sharedSecretBytes } = await elGamalSecretRawBytes(publicKeyBytes)
     return { referencePointBytes, sharedSecretBytes: await sha512Bytes(concat(sharedSecretBytes, utf8(contextString))) }
 }
 
-export const diffieHellmanSecretRawHex = async (secretKeyHex, publicKeyHex) => tbut.bytesToHex(await diffieHellmanSecretRawBytes(hexToBytes(secretKeyHex), hexToBytes(publicKeyHex)))
-export const diffieHellmanSecretHashHex = async (secretKeyHex, publicKeyHex, contextString = "") => tbut.bytesToHex(await diffieHellmanSecretHashBytes(hexToBytes(secretKeyHex), hexToBytes(publicKeyHex), contextString))
+// two keys: the secret key decides the mode
+export const diffieHellmanSecretRaw = async (secretKey, publicKey) => asModeOf(secretKey, await diffieHellmanSecretRawBytes(asBytes(secretKey), asBytes(publicKey)))
+export const diffieHellmanSecretHash = async (secretKey, publicKey, contextString) => asModeOf(secretKey, await diffieHellmanSecretHashBytes(asBytes(secretKey), asBytes(publicKey), contextString))
 
-export const elGamalSecretRawHex = async (publicKeyHex) => {
-    const { referencePointBytes, sharedSecretBytes } = await elGamalSecretRawBytes(hexToBytes(publicKeyHex))
-    return { referencePointHex: tbut.bytesToHex(referencePointBytes), sharedSecretHex: tbut.bytesToHex(sharedSecretBytes) }
-}
-export const elGamalSecretHashHex = async (publicKeyHex, contextString = "") => {
-    const { referencePointBytes, sharedSecretBytes } = await elGamalSecretHashBytes(hexToBytes(publicKeyHex), contextString)
-    return { referencePointHex: tbut.bytesToHex(referencePointBytes), sharedSecretHex: tbut.bytesToHex(sharedSecretBytes) }
-}
-
-// aliases - kept for compatibility
-export const diffieHellmanSecretRaw = diffieHellmanSecretRawHex
-export const createSharedSecretRaw = diffieHellmanSecretRawHex
-export const createSharedSecretRawHex = diffieHellmanSecretRawHex
-export const sharedSecretRawBytes = diffieHellmanSecretRawBytes
-
-export const diffieHellmanSecretHash = diffieHellmanSecretHashHex
-export const createSharedSecretHash = diffieHellmanSecretHashHex
-export const createSharedSecretHashHex = diffieHellmanSecretHashHex
-export const sharedSecretHashBytes = diffieHellmanSecretHashBytes
-
-export const elGamalSecretRaw = elGamalSecretRawHex
-export const referencedSharedSecretRaw = elGamalSecretRawHex
-export const referencedSharedSecretRawHex = elGamalSecretRawHex
-export const referencedSecretRaw = elGamalSecretRawHex
-export const referencedSecretRawHex = elGamalSecretRawHex
-export const referencedSharedSecretRawBytes = elGamalSecretRawBytes
-export const referencedSecretRawBytes = elGamalSecretRawBytes
-
-export const elGamalSecretHash = elGamalSecretHashHex
-export const referencedSharedSecretHash = elGamalSecretHashHex
-export const referencedSharedSecretHashHex = elGamalSecretHashHex
-export const referencedSecretHash = elGamalSecretHashHex
-export const referencedSecretHashHex = elGamalSecretHashHex
-export const referencedSharedSecretHashBytes = elGamalSecretHashBytes
-export const referencedSecretHashBytes = elGamalSecretHashBytes
+export const elGamalSecretRaw = async (publicKey) => asModeOfObject(publicKey, await elGamalSecretRawBytes(asBytes(publicKey)))
+export const elGamalSecretHash = async (publicKey, contextString) => asModeOfObject(publicKey, await elGamalSecretHashBytes(asBytes(publicKey), contextString))
 
 //#endregion
 
