@@ -250,10 +250,12 @@ export const deriveSymKeyFromPassword = async (password, saltHex = tbut.bytesToH
 
 //############################################################
 //#region asymmetric encryption
-// ElGamal style: referencePoint A is sent along, DH(n, B) = DH(k, A) is the shared secret, sha512 of it the symmetric key
+// ElGamal style: referencePoint A is sent along, DH(n, B) = DH(k, A) is the shared secret
+// symmetric key = sha512(shared ‖ A): A and -A give the same X25519 secret, A's exact bytes make the key differ
 export const asymmetricEncryptBytes = async (content, publicKeyBytes, context = "") => {
     const { referencePointBytes, sharedSecretBytes } = await elGamalSecretRawBytes(publicKeyBytes)
-    const encryptedContentBytes = await symmetricEncryptBytes(content, await sha512Bytes(sharedSecretBytes), context)
+    const keyBytes = await sha512Bytes(concat(sharedSecretBytes, referencePointBytes))
+    const encryptedContentBytes = await symmetricEncryptBytes(content, keyBytes, context)
     return { referencePointBytes, encryptedContentBytes }
 }
 
@@ -262,7 +264,7 @@ export const asymmetricDecryptBytes = async (secrets, secretKeyBytes, context = 
     const gibbrishBytes = secrets.encryptedContentBytes || secrets.encryptedContent
     if (ABytes == null || gibbrishBytes == null) throw new Error("Invalid secrets Object!")
     const kABytes = await diffieHellmanSecretRawBytes(secretKeyBytes, ABytes)
-    return symmetricDecryptBytes(gibbrishBytes, await sha512Bytes(kABytes), context)
+    return symmetricDecryptBytes(gibbrishBytes, await sha512Bytes(concat(kABytes, ABytes)), context)
 }
 
 export const asymmetricEncryptHex = async (content, publicKeyHex, context) => {

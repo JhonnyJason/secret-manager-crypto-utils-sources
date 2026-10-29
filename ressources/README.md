@@ -19,19 +19,22 @@ It is:
 There is a convenience package around this - the [Thingy-Crypto-Node](https://www.npmjs.com/package/thingy-crypto-node)
 
 ## Usage
-One implementation on WebCrypto for node (>= 20), deno, bun, browsers and workers. Every function returns a Promise, except `createSymKey*`.
+One implementation on WebCrypto for node (>= 20), deno, bun, browsers and workers. Every function returns a Promise.
+
+Ed25519 and X25519 run natively in WebCrypto where the runtime has them (node, deno, bun, current browsers), and on [noble-ed25519](#noble-ed25519) otherwise. Both paths give the same bytes and the same verification answers, and the test suite runs on each of them.
 
 ```js
 import * as secUtl from "secret-manager-crypto-utils"
 
 const { secretKeyHex, publicKeyHex } = await secUtl.createKeyPair()
 const sig = await secUtl.createSignature("hello", secretKeyHex)
-await secUtl.verify(sig, publicKeyHex, "hello") // true
+const err = await secUtl.verifySignature(sig, publicKeyHex, "hello") // undefined = valid
+if (err) throw new Error(err) // "Invalid signature!" or "Malformed input!"
 
 const secrets = await secUtl.asymmetricEncrypt("my secret", publicKeyHex)
 await secUtl.asymmetricDecrypt(secrets, secretKeyHex) // "my secret"
 
-const keyHex = secUtl.createSymKey()
+const keyHex = await secUtl.createSymKey()
 const gibbrish = await secUtl.symmetricEncrypt("my secret", keyHex)
 await secUtl.symmetricDecrypt(gibbrish, keyHex) // "my secret"
 ```
@@ -50,33 +53,35 @@ createKeyPairHex() -> { secretKeyHex, publicKeyHex }          // alias createKey
 createKeyPairBytes() -> { secretKeyBytes, publicKeyBytes }
 createPublicKeyHex(secretKeyHex) -> publicKeyHex              // alias createPublicKey
 createPublicKeyBytes(secretKeyBytes) -> publicKeyBytes
-createSymKeyHex() -> hex          // sync, 48 bytes            // alias createSymKey
-createSymKeyBytes() -> Uint8Array // sync, 48 bytes
+createSymKeyHex() -> hex          // 48 bytes                  // alias createSymKey
+createSymKeyBytes() -> Uint8Array // 48 bytes
 
 // signatures (ed25519, strict RFC 8032)
 createSignatureHex(content, secretKeyHex) -> sigHex           // alias createSignature
 createSignatureBytes(content, secretKeyBytes) -> sigBytes
-verifyHex(sigHex, publicKeyHex, content) -> boolean           // alias verify
-verifyBytes(sigBytes, publicKeyBytes, content) -> boolean
+// undefined when valid, else an error string - never throws
+verifySignatureHex(sigHex, publicKeyHex, content) -> undefined | string    // alias verifySignature
+verifySignatureBytes(sigBytes, publicKeyBytes, content) -> undefined | string
 
 // symmetric encryption (AES-256-GCM, format v1) - key: >= 48 bytes
-symmetricEncryptHex(content, keyHex) -> gibbrishHex           // alias symmetricEncrypt
-symmetricEncryptBytes(content, keyBytes) -> gibbrishBytes
-symmetricDecryptHex(gibbrishHex, keyHex) -> content           // alias symmetricDecrypt
-symmetricDecryptBytes(gibbrishBytes, keyBytes) -> content
+// context: optional, authenticated (GCM additionalData) but not stored - decrypt needs the same one
+symmetricEncryptHex(content, keyHex, context = "") -> gibbrishHex           // alias symmetricEncrypt
+symmetricEncryptBytes(content, keyBytes, context = "") -> gibbrishBytes
+symmetricDecryptHex(gibbrishHex, keyHex, context = "") -> content           // alias symmetricDecrypt
+symmetricDecryptBytes(gibbrishBytes, keyBytes, context = "") -> content
 
-// password based key derivation - low-entropy inputs (passwords, PINs) only
+// password based key derivation - passwords only, iterations 1000..10000000
 // store saltHex and iterations next to the ciphertext, they are needed to derive the same key again
 deriveSymKeyFromPassword(password, saltHex = random 16 bytes, iterations = 600000) -> { keyHex, saltHex, iterations }
 
-// asymmetric encryption (ElGamal style)
-asymmetricEncryptHex(content, publicKeyHex) -> { referencePointHex, encryptedContentHex }      // alias asymmetricEncrypt
-asymmetricEncryptBytes(content, publicKeyBytes) -> { referencePointBytes, encryptedContentBytes }
-asymmetricDecryptHex(secrets, secretKeyHex) -> content        // alias asymmetricDecrypt
-asymmetricDecryptBytes(secrets, secretKeyBytes) -> content
+// asymmetric encryption (ElGamal style), context as for symmetric
+asymmetricEncryptHex(content, publicKeyHex, context = "") -> { referencePointHex, encryptedContentHex }      // alias asymmetricEncrypt
+asymmetricEncryptBytes(content, publicKeyBytes, context = "") -> { referencePointBytes, encryptedContentBytes }
+asymmetricDecryptHex(secrets, secretKeyHex, context = "") -> content        // alias asymmetricDecrypt
+asymmetricDecryptBytes(secrets, secretKeyBytes, context = "") -> content
 // decrypt also accepts { referencePoint, encryptedContent }
 
-// Diffie-Hellman shared secret: ours secretKey * their publicKey
+// Diffie-Hellman shared secret: X25519 of our secretKey and their publicKey
 diffieHellmanSecretRawHex(secretKeyHex, publicKeyHex) -> hex (32 bytes)
 diffieHellmanSecretRawBytes(secretKeyBytes, publicKeyBytes) -> Uint8Array
 diffieHellmanSecretHashHex(secretKeyHex, publicKeyHex, context = "") -> hex (64 bytes)
@@ -89,7 +94,7 @@ elGamalSecretHashHex(publicKeyHex, context = "") -> { referencePointHex, sharedS
 elGamalSecretHashBytes(publicKeyBytes, context = "") -> { referencePointBytes, sharedSecretBytes }
 ```
 
-Errors: invalid hex → `SyntaxError`; content that is not a well-formed string → `TypeError`; wrong key lengths, small-order public keys, short KDF salt → `RangeError`; any decryption failure → `Error("Decryption failed!")`.
+Errors: invalid hex → `SyntaxError`; content that is not a well-formed string, or bytes that are not a `Uint8Array` → `TypeError`; wrong key lengths, small-order public keys, short KDF salt, iterations out of range → `RangeError`; any decryption failure → `Error("Decryption failed!")`. `verifySignature*` is the exception: it never throws, see [Security notes](#security-notes).
 
 ### Aliases (kept for compatibility)
 | canonical | aliases |
@@ -109,8 +114,12 @@ Errors: invalid hex → `SyntaxError`; content that is not a well-formed string 
 - `symmetricEncrypt` writes [format v1](#symmetric-format-v1) (AES-256-GCM). Decryption still reads v0.3.x ciphertext, but **v0.3.x cannot decrypt v1** - update readers before writers.
 - `sha256`/`sha512` are async on node too (they always were in the browser).
 - `saltContent`/`unsaltContent` are removed.
+- `verify*` is replaced by `verifySignature*`: it resolves `undefined` when valid and an error string otherwise, and never throws. `verify`, `verifyHex` and `verifyBytes` are gone.
+- `createSymKey*` is async, like every other function.
+- **Shared secrets changed:** Diffie-Hellman and ElGamal secrets are X25519 again (the same values as v0.1.x–0.2.x), not the Edwards point of v0.3.x. Anything keyed by a v0.3.x secret has to be re-derived.
+- Asymmetric encryption uses `sha512(shared ‖ referencePoint)` as key, on top of the new shared secret.
 - ed25519 secret keys must be exactly 32 bytes, symmetric keys at least 48 bytes, signatures 64 bytes.
-- Small-order public keys are rejected everywhere, and `verify` is strict RFC 8032 (no ZIP-215).
+- Small-order public keys are rejected everywhere, and verification is strict RFC 8032 (no ZIP-215).
 - Strings with lone surrogates (`"a\uD800"`) throw instead of being silently changed to `"a\uFFFD"`.
 - Node >= 20.
 
@@ -146,7 +155,7 @@ The big wins of hex in readability and processability beats out the "downside" o
 
 
 ## Encryption
-For the asymmetric encryption we use ed25519 keys for producing El-Gamal-style shared secret-keys (`sha512` of the shared point) which we then use for symmetrically encrypting the contents.
+For the asymmetric encryption we use the ed25519 keys for an ElGamal-style X25519 shared secret with a one-time key. The symmetric key is `sha512(shared ‖ referencePoint)`, which then encrypts the content in [format v1](#symmetric-format-v1).
 
 The result of this kind of encryption is always an Object like:
 ```json
@@ -175,9 +184,16 @@ Residual risks of this fallback, accepted until all old secrets are re-encrypted
 
 ### Security notes
 - **Not key-committing.** AES-GCM does not bind the ciphertext to one key: a crafted ciphertext can decrypt successfully under two different keys ("invisible salamanders"). Don't use decryption success as proof of *which* key was used.
-- **No key binding on the asymmetric path.** The symmetric key is `sha512(shared point)` and does not include the referencePoint or the recipient key (kept for v0.3.x compatibility). Asymmetric encryption is not authenticated: anyone with the public key can encrypt, so sign the content if the sender matters.
-- **Small-order points** (identity and the 7 torsion points) give a shared secret everybody knows. They are rejected as public keys and reference points.
-- **Strict signatures.** `verify` follows RFC 8032 with canonical encodings (no ZIP-215), so one signature cannot verify every message under a small-order key, and signatures are not malleable.
+- **Asymmetric key binding.** The symmetric key is `sha512(shared ‖ referencePoint)`. A and −A give the same X25519 secret, so without the referencePoint in the hash its sign bit could be flipped unnoticed. With it, any change to the referencePoint makes decryption fail. The recipient key is not included, because the only keys giving the same secret are equivalent keys of the same recipient (see below). Asymmetric encryption is not authenticated: anyone with the public key can encrypt, so sign the content if the sender matters.
+- **Small-order points** (identity and the 7 torsion points) give a shared secret everybody knows. They are rejected with a `RangeError` as public keys and reference points, for Diffie-Hellman, ElGamal and asymmetric encryption.
+- **Equivalent public keys in shared secrets.** X25519 multiplies by a multiple of 8, so a torsion component of a public key has no effect, and B, −B and B + torsion all give the same shared secret (standard X25519 behaviour). Nothing about the secret key leaks. Just don't treat two different public key encodings as two different parties because their secrets differ: they don't.
+- **Strict signatures, the same answer everywhere.** `verifySignature*` follows RFC 8032 with canonical encodings (no ZIP-215) and the cofactorless equation. These signatures are always invalid:
+  - small-order public keys - one signature would verify every message under such a key
+  - small-order R (the first half of the signature), as the WebCrypto spec requires
+  - non-canonical encodings of the key or R, and S ≥ L (no malleable signatures)
+  
+  Native WebCrypto implementations disagree on exactly these cases (bun and deno accept small-order keys and R, noble alone would accept cofactored-only signatures). We check them in JS before the native call, so every runtime and the fallback answer the same.
+- **`verifySignature*` never throws.** Malformed input (bad hex, wrong lengths, wrong types, lone surrogates) gives `"Malformed input!"`, a wrong signature `"Invalid signature!"`, a valid one `undefined`. A forgotten `await` fails closed, because a Promise is truthy.
 - **Passwords:** `deriveSymKeyFromPassword` is PBKDF2-SHA256, 600000 iterations by default, with a random 16 byte salt (shorter salts throw). Passwords are NFC-normalized, so the same password typed on different platforms gives the same key. Random keys belong to `createSymKey`, not the KDF.
 
 ## Salt Envelope
@@ -245,7 +261,7 @@ sharedSecretHex == bobSharedSecret // true
 ```
 
 ## Noble ed25519
-All of this is straight forward based on [noble-ed25519](https://github.com/paulmillr/noble-ed25519). A very concise and modern package for freely using the ed25519 algorithms. Big thanks for that!
+The point arithmetic, key derivation and the fallback where WebCrypto has no Ed25519/X25519 are based on [noble-ed25519](https://github.com/paulmillr/noble-ed25519). A very concise and modern package for freely using the ed25519 algorithms. Big thanks for that!
 
 ---
 
