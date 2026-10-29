@@ -8,8 +8,8 @@ Usable in the backend and the frontend.
 It is:
 - sha256
 - sha512
-- Sign/Verify via Ed25519
-- Asymmetric Encrypt/Decrypt in ElGamal style using the Twisted Edwards Curve
+- Sign/Verify via Ed25519 (native WebCrypto where available, noble fallback - same results everywhere)
+- Asymmetric Encrypt/Decrypt in ElGamal style using X25519 (native WebCrypto where available, noble fallback)
 - Symmetric Encrypt/Decrypt with AES-256-GCM ([format v1](#symmetric-format-v1)), still decrypting [legacy](#legacy-v03x-ciphertext) AES-256-CBC
 - Password based key derivation (PBKDF2-SHA256)
 - DiffieHellman style sharedSecret as `privA * pubB = privB * pubA` in Raw and Hashed version

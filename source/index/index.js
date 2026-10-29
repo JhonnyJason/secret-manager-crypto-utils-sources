@@ -40,15 +40,36 @@ const concat = (a, b) => {
     return result
 }
 
-// small-order points give a shared secret everybody knows, a torsion component leaks k mod 8
+// small-order points give a shared secret everybody knows - torsion components are harmless, X25519 clamping removes them
 const publicPoint = (publicKeyBytes) => {
     const P = ed.Point.fromBytes(publicKeyBytes)
-    if (P.isSmallOrder() || !P.isTorsionFree()) throw new RangeError("Invalid public key!")
+    if (P.isSmallOrder()) throw new RangeError("Invalid public key!")
     return P
 }
 
-// sha512(secretKey) clamped and reduced mod ORDER - the ed25519 secret scalar
-const secretScalar = async (secretKeyBytes) => (await ed.utils.getExtendedPublicKeyAsync(secretKeyBytes)).scalar
+// noble checks the length itself, WebCrypto would throw a DOMException instead
+const checkSecretKey = (secretKeyBytes) => {
+    checkBytes(secretKeyBytes)
+    if (secretKeyBytes.length != 32) throw new RangeError("Secret key must have 32 bytes!")
+}
+
+const { p: P, n: L } = ed.Point.CURVE()
+const bytesToNumberLE = (bytes) => BigInt("0x" + tbut.bytesToHex(bytes.slice().reverse()))
+const numberToBytesLE = (n) => hexToBytes(n.toString(16).padStart(64, "0")).reverse()
+// Montgomery u = (1 + y) / (1 - y) of an Edwards point - the X25519 public key
+const montgomeryU = (point) => {
+    const { y } = point.toAffine()
+    return numberToBytesLE(ed.etc.mod((1n + y) * ed.etc.invert(1n - y, P), P))
+}
+
+// native Ed25519/X25519 where the runtime has it, noble otherwise - both give the same bytes
+// pkcs8 wrappers around a raw 32 byte seed (RFC 8410)
+const ED25519_PKCS8 = hexToBytes("302e020100300506032b657004220420")
+const X25519_PKCS8 = hexToBytes("302e020100300506032b656e04220420")
+const importPkcs8 = (prefix, seed, name, usage) => subtle.importKey("pkcs8", concat(prefix, seed), name, false, [usage])
+const isNative = (prefix, name, usage) => importPkcs8(prefix, new Uint8Array(32), name, usage).then(() => true, () => false)
+const nativeEd25519 = await isNative(ED25519_PKCS8, "Ed25519", "sign")
+const nativeX25519 = await isNative(X25519_PKCS8, "X25519", "deriveBits")
 
 const importAesCbcKey = (keyBytes) => subtle.importKey("raw", keyBytes, { name: "AES-CBC" }, false, ["encrypt", "decrypt"])
 const importAesGcmKey = (keyBytes) => subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["encrypt", "decrypt"])
@@ -91,14 +112,43 @@ export const createPublicKey = createPublicKeyHex
 
 //############################################################
 //#region signatures
-export const createSignatureBytes = async (content, signingKeyBytes) => ed.signAsync(utf8(content), signingKeyBytes)
+export const createSignatureBytes = async (content, signingKeyBytes) => {
+    const message = utf8(content)
+    checkSecretKey(signingKeyBytes)
+    if (!nativeEd25519) return ed.signAsync(message, signingKeyBytes)
+    const key = await importPkcs8(ED25519_PKCS8, signingKeyBytes, "Ed25519", "sign")
+    return new Uint8Array(await subtle.sign("Ed25519", key, message))
+}
+
 // undefined when valid, else an error string - never throws, and a missing await is truthy so it fails closed
-// strict RFC 8032: zip215 accepts small-order keys for which one signature verifies any message
+// strict RFC 8032, the same answer on every path: canonical A and R, S < L, cofactorless equation
+// A and R are decoded and small-order rejected here, as the WebCrypto spec demands - node does, bun/deno native don't
+// a small-order key would let one signature verify any message
 export const verifySignatureBytes = async (sigBytes, keyBytes, content) => {
     try {
-        if (await ed.verifyAsync(sigBytes, utf8(content), keyBytes, { zip215: false })) return undefined
+        const message = utf8(content)
+        checkBytes(sigBytes)
+        if (sigBytes.length != 64) throw new RangeError("Signature must have 64 bytes!")
+        const A = ed.Point.fromBytes(keyBytes, false)
+        let R
+        try { R = ed.Point.fromBytes(sigBytes.subarray(0, 32), false) } catch { return "Invalid signature!" }
+        if (A.isSmallOrder() || R.isSmallOrder()) return "Invalid signature!"
+        if (await (nativeEd25519 ? verifyNative : verifyFallback)(sigBytes, keyBytes, A, R, message)) return undefined
         return "Invalid signature!"
     } catch { return "Malformed input!" }
+}
+
+const verifyNative = async (sigBytes, keyBytes, A, R, message) => {
+    const key = await subtle.importKey("raw", keyBytes, "Ed25519", false, ["verify"])
+    return subtle.verify("Ed25519", key, sigBytes, message)
+}
+
+// S·G == R + k·A without the cofactor, like every native implementation - noble's cofactored check accepts more
+const verifyFallback = async (sigBytes, keyBytes, A, R, message) => {
+    const S = bytesToNumberLE(sigBytes.subarray(32))
+    if (S >= L) return false
+    const k = bytesToNumberLE(await sha512Bytes(concat(concat(sigBytes.subarray(0, 32), keyBytes), message))) % L
+    return ed.Point.BASE.multiply(S, false).equals(R.add(A.multiply(k, false)))
 }
 
 export const createSignatureHex = async (content, signingKeyHex) => tbut.bytesToHex(await createSignatureBytes(content, hexToBytes(signingKeyHex)))
@@ -200,7 +250,7 @@ export const deriveSymKeyFromPassword = async (password, saltHex = tbut.bytesToH
 
 //############################################################
 //#region asymmetric encryption
-// ElGamal style: A = lG is sent along, lB = kA is the shared secret, sha512(lB) the symmetric key
+// ElGamal style: referencePoint A is sent along, DH(n, B) = DH(k, A) is the shared secret, sha512 of it the symmetric key
 export const asymmetricEncryptBytes = async (content, publicKeyBytes, context = "") => {
     const { referencePointBytes, sharedSecretBytes } = await elGamalSecretRawBytes(publicKeyBytes)
     const encryptedContentBytes = await symmetricEncryptBytes(content, await sha512Bytes(sharedSecretBytes), context)
@@ -234,10 +284,20 @@ export const asymmetricDecrypt = asymmetricDecryptHex
 
 //############################################################
 //#region diffieHellman/ElGamal secrets
-// k = secretScalar(our secretKey), B = their publicKey, kB = shared secret
+// X25519: h = sha512(our secretKey)[0:32], B = their publicKey, shared secret = u(clamp(h)·B) - same as v0.1.0-0.2.0
+// clamping makes the scalar a multiple of 8, so a torsion component of B drops out
 export const diffieHellmanSecretRawBytes = async (secretKeyBytes, publicKeyBytes) => {
+    checkSecretKey(secretKeyBytes)
     const B = publicPoint(publicKeyBytes)
-    return B.multiply(await secretScalar(secretKeyBytes)).toBytes()
+    const h = (await sha512Bytes(secretKeyBytes)).subarray(0, 32)
+    if (nativeX25519) {
+        const privateKey = await importPkcs8(X25519_PKCS8, h, "X25519", "deriveBits")
+        const publicKey = await subtle.importKey("raw", montgomeryU(B), "X25519", false, [])
+        return new Uint8Array(await subtle.deriveBits({ name: "X25519", public: publicKey }, privateKey, 256))
+    }
+    h[0] &= 248; h[31] &= 127; h[31] |= 64
+    // clamp(h)·B as (clamp(h)/8)·(8B): noble needs a scalar below L
+    return montgomeryU(B.clearCofactor().multiply((bytesToNumberLE(h) >> 3n) % L))
 }
 
 export const diffieHellmanSecretHashBytes = async (secretKeyBytes, publicKeyBytes, contextString = "") => {
@@ -245,11 +305,11 @@ export const diffieHellmanSecretHashBytes = async (secretKeyBytes, publicKeyByte
     return sha512Bytes(concat(kBBytes, utf8(contextString)))
 }
 
-// one-time secret n -> l = secretScalar(n), A = lG = referencePoint, lB = shared secret
+// one-time secret key n, A = publicKey(n) = referencePoint, shared secret = DH(n, B)
 export const elGamalSecretRawBytes = async (publicKeyBytes) => {
-    const B = publicPoint(publicKeyBytes)
-    const { scalar, pointBytes } = await ed.utils.getExtendedPublicKeyAsync(ed.utils.randomSecretKey())
-    return { referencePointBytes: pointBytes, sharedSecretBytes: B.multiply(scalar).toBytes() }
+    const n = ed.utils.randomSecretKey()
+    const sharedSecretBytes = await diffieHellmanSecretRawBytes(n, publicKeyBytes)
+    return { referencePointBytes: await createPublicKeyBytes(n), sharedSecretBytes }
 }
 
 export const elGamalSecretHashBytes = async (publicKeyBytes, contextString = "") => {
