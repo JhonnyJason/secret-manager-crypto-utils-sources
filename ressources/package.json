@@ -4,7 +4,11 @@
     "description": "Small set of crypto utilities - ed25519 signatures, el-gamal encryption, diffie-hellman and elGamal secret sharing. One WebCrypto implementation for node, deno, bun and browsers.",
     "main": "index.js",
     "types": "index.d.ts",
-    "files": ["index.js", "index.d.ts"],
+    "exports": {
+        ".": { "types": "./index.d.ts", "default": "./index.js" },
+        "./legacy": { "types": "./legacy.d.ts", "default": "./legacy.js" }
+    },
+    "files": ["index.js", "index.d.ts", "legacy.js", "legacy.d.ts"],
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1"
     },

@@ -78,7 +78,6 @@ const isNative = (prefix, name, usage) => importPkcs8(prefix, new Uint8Array(32)
 const nativeEd25519 = await isNative(ED25519_PKCS8, "Ed25519", "sign")
 const nativeX25519 = await isNative(X25519_PKCS8, "X25519", "deriveBits")
 
-const importAesCbcKey = (keyBytes) => subtle.importKey("raw", keyBytes, { name: "AES-CBC" }, false, ["encrypt", "decrypt"])
 const importAesGcmKey = (keyBytes) => subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["encrypt", "decrypt"])
 
 //#endregion
@@ -182,7 +181,7 @@ const symmetricEncryptBytes = async (content, keyBytes, context = "") => {
     return result
 }
 
-// v1 when the tag verifies, else legacy CBC (1/256 of legacy ciphertexts start with 0x01 too)
+// v1 only - legacy ciphertext is read by the ./legacy entry point
 const symmetricDecryptBytes = async (gibbrishBytes, keyBytes, context = "") => {
     checkSymKey(keyBytes)
     checkBytes(gibbrishBytes)
@@ -190,8 +189,6 @@ const symmetricDecryptBytes = async (gibbrishBytes, keyBytes, context = "") => {
     if (gibbrishBytes[0] == V1 && gibbrishBytes.length >= V1_MIN_LENGTH) {
         try { return await decryptV1(gibbrishBytes, keyBytes, additionalData) } catch { }
     }
-    // legacy CBC cannot check a context, so a caller asking for one must not get legacy plaintext
-    if (context === "") try { return await decryptLegacy(gibbrishBytes, keyBytes) } catch { }
     throw new Error("Decryption failed!")
 }
 
@@ -202,12 +199,6 @@ const decryptV1 = async (gibbrishBytes, keyBytes, additionalData) => {
     const params = { name: "AES-GCM", iv: nonce, tagLength: 128, additionalData }
     const padded = await subtle.decrypt(params, key, gibbrishBytes.subarray(1 + NONCE_LENGTH))
     return unpadContent(new Uint8Array(padded))
-}
-
-const decryptLegacy = async (gibbrishBytes, keyBytes) => {
-    const iv = keyBytes.subarray(0, 16)
-    const key = await importAesCbcKey(keyBytes.subarray(16, 48))
-    return unsaltContent(new Uint8Array(await subtle.decrypt({ name: "AES-CBC", iv }, key, gibbrishBytes)))
 }
 
 const padContent = (content) => {
@@ -262,10 +253,10 @@ const asymmetricDecryptBytes = async (ABytes, gibbrishBytes, secretKeyBytes, con
 
 export const asymmetricEncrypt = async (content, publicKey, context) => asModeOfObject(publicKey, await asymmetricEncryptBytes(content, asBytes(publicKey), context))
 
-// takes the …Hex, the …Bytes and the unsuffixed (pre v0.3) property names
+// takes the …Hex and the …Bytes property names
 export const asymmetricDecrypt = async (secrets, secretKey, context) => {
-    const A = secrets.referencePointHex || secrets.referencePointBytes || secrets.referencePoint
-    const gibbrish = secrets.encryptedContentHex || secrets.encryptedContentBytes || secrets.encryptedContent
+    const A = secrets.referencePointHex || secrets.referencePointBytes
+    const gibbrish = secrets.encryptedContentHex || secrets.encryptedContentBytes
     if (A == null || gibbrish == null) throw new Error("Invalid secrets Object!")
     return asymmetricDecryptBytes(asBytes(A), asBytes(gibbrish), asBytes(secretKey), context)
 }
@@ -313,38 +304,5 @@ export const diffieHellmanSecretHash = async (secretKey, publicKey, contextStrin
 
 export const elGamalSecretRaw = async (publicKey) => asModeOfObject(publicKey, await elGamalSecretRawBytes(asBytes(publicKey)))
 export const elGamalSecretHash = async (publicKey, contextString) => asModeOfObject(publicKey, await elGamalSecretHashBytes(asBytes(publicKey), contextString))
-
-//#endregion
-
-//############################################################
-//#region legacy salt envelope
-// strips the salt envelope v0.3.1 put around content before AES-CBC
-const unsaltContent = (contentBytes) => {
-    const fullLength = contentBytes.length
-    const limit = Math.min(fullLength, 160)
-
-    let sum = 0
-    let idx = 32
-    while (idx--) sum += contentBytes[idx]
-
-    let start, padding
-    for (idx = 32; idx <= limit; idx++) {
-        if (sum == (contentBytes[idx] * 256 + contentBytes[idx + 1])) {
-            start = idx + 3
-            padding = contentBytes[idx + 2]
-            break
-        }
-        sum += contentBytes[idx]
-    }
-    if (idx > limit) throw new Error("Unsalt: No valid prefix ending found!")
-
-    // Check if the padding matches the salt - so we can verify here nobody has tampered with it
-    const end = fullLength - 1
-    let invalid = 0
-    for (idx = 0; idx < padding; idx++) invalid += (contentBytes[idx] != contentBytes[end - idx])
-    if (invalid) throw new Error("Unsalt: Postfix and prefix did not match as expected!")
-
-    return tbut.bytesToUtf8(contentBytes.subarray(start, fullLength - padding))
-}
 
 //#endregion

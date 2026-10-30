@@ -10,7 +10,7 @@ It is:
 - sha512
 - Sign/Verify via Ed25519 (native WebCrypto where available, noble fallback - same results everywhere)
 - Asymmetric Encrypt/Decrypt in ElGamal style using X25519 (native WebCrypto where available, noble fallback)
-- Symmetric Encrypt/Decrypt with AES-256-GCM ([format v1](#symmetric-format-v1)), still decrypting [legacy](#legacy-v03x-ciphertext) AES-256-CBC
+- Symmetric Encrypt/Decrypt with AES-256-GCM ([format v1](#symmetric-format-v1)). Data of older versions is read by the separate [legacy entry point](#legacy-entry-point)
 - Password based key derivation (PBKDF2-SHA256)
 - DiffieHellman style sharedSecret as `privA * pubB = privB * pubA` in Raw and Hashed version
 - ElGamal style sharedSecret using an ephemeral random `privA` and providing the referencePoint `pubA` in Raw and Hashed version
@@ -153,12 +153,26 @@ The result of this kind of encryption is always an Object like:
 - `padLen` is random 0-255 and hides the exact content length (to within 256 bytes). It is inside the authenticated data.
 - Every failure is one generic `Error("Decryption failed!")`, which never says why.
 
-### Legacy v0.3.x ciphertext
-Decryption tries v1 when the first byte is `0x01` and the GCM tag verifies, otherwise it falls back to the old AES-256-CBC + [salt envelope](#salt-envelope) (1/256 of old ciphertexts also start with `0x01`, so the tag decides, not the version byte).
+### Legacy entry point
+The main API reads format v1 only. Data written by older versions is read by `secret-manager-crypto-utils/legacy`, read-side only, to convert it: read with the legacy function, write again with the main API. It will be removed once the deprecated systems are migrated.
 
-Residual risks of this fallback, accepted until all old secrets are re-encrypted:
-- CBC has no real integrity check. A tampered v1 ciphertext falls through to CBC and, with tiny probability (valid PKCS#7 padding *and* a valid salt envelope), returns garbage instead of throwing.
-- Success or failure and the timing difference between the padding check and the salt check could act as a padding oracle on **old** ciphertexts if a service decrypts attacker-controlled input and reports the result. Do not expose decryption of untrusted input as a service, and re-encrypt old secrets (decrypt + encrypt writes v1).
+```js
+import * as legacy from "secret-manager-crypto-utils/legacy"
+const content = await legacy.symmetricDecryptV0_3_1(oldGibbrishHex, keyHex)
+const gibbrish = await secUtl.symmetricEncrypt(content, keyHex)
+```
+
+| Data written by | Read with |
+|---|---|
+| symmetric 0.3.0 – 0.3.1 | `symmetricDecryptV0_3_1` |
+| symmetric 0.0.1 – 0.2.0 | `symmetricDecryptV0_2_0` (no integrity check: try `V0_3_1` first) |
+| asymmetric 0.3.0 – 0.3.1 | `asymmetricDecryptV0_3_1` |
+| asymmetric 0.1.0 – 0.2.0 | `asymmetricDecryptV0_2_0` |
+| asymmetric 0.0.4 – 0.0.7, `asymmetricEncryptOld` | `asymmetricDecryptV0_0_7` |
+| signatures 0.0.2 – 0.2.0 | `verifySignatureV0_2_0` (re-sign with `createSignature`) |
+| DH / elGamal secrets 0.3.0 – 0.3.1 | `diffieHellmanSecretRawV0_3_1`, `diffieHellmanSecretHashV0_3_1` |
+
+Signatures since 0.3.0 and DH / elGamal secrets of 0.1.0 – 0.2.0 need no legacy function: the main API gives the same results. Old CBC formats derive the IV from the key and have no (or a weak) integrity check, so convert and don't keep reading them.
 
 ### Security notes
 - **Not key-committing.** AES-GCM does not bind the ciphertext to one key: a crafted ciphertext can decrypt successfully under two different keys ("invisible salamanders"). Don't use decryption success as proof of *which* key was used.
@@ -175,7 +189,7 @@ Residual risks of this fallback, accepted until all old secrets are re-encrypted
 - **Passwords:** `deriveSymKeyFromPassword` is PBKDF2-SHA256, 600000 iterations by default, with a random 16 byte salt (shorter salts throw). Passwords are NFC-normalized, so the same password typed on different platforms gives the same key. Random keys belong to `createSymKey`, not the KDF.
 
 ## Salt Envelope
-*Legacy (v0.3.x), only read by decryption now.*
+*Legacy (v0.3.x), only read by `symmetricDecryptV0_3_1` of the [legacy entry point](#legacy-entry-point).*
 
 We random length prefix of random bytes to obsucate where potentially known plaintext could be.
 
