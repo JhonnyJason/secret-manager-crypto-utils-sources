@@ -227,6 +227,7 @@ export const deriveSymKeyFromPassword = async (password, saltHex = tbut.bytesToH
     if (!Number.isInteger(iterations) || iterations < 1000 || iterations > 10000000) throw new RangeError("Iterations must be an integer in 1000..10000000!")
     const salt = hexToBytes(saltHex)
     if (salt.length < 16) throw new RangeError("Salt must have at least 16 bytes!")
+    utf8(password) // thingy-byte-utils rejects lone surrogates before Firefox's normalize would turn them into U+FFFD
     const baseKey = await subtle.importKey("raw", utf8(password.normalize("NFC")), "PBKDF2", false, ["deriveBits"])
     const params = { name: "PBKDF2", hash: "SHA-256", salt, iterations }
     const keyHex = tbut.bytesToHex(await subtle.deriveBits(params, baseKey, 48 * 8))
@@ -265,7 +266,7 @@ export const asymmetricDecrypt = async (secrets, secretKey, context) => {
 
 //############################################################
 //#region diffieHellman/ElGamal secrets
-// X25519: h = sha512(our secretKey)[0:32], B = their publicKey, shared secret = u(clamp(h)·B) - same as v0.1.0-0.2.0
+// X25519: h = sha512(our secretKey)[0:32], B = their publicKey, shared secret = u(clamp(h)·B) - raw is the same as v0.1.0-0.2.0
 // clamping makes the scalar a multiple of 8, so a torsion component of B drops out
 const diffieHellmanSecretRawBytes = async (secretKeyBytes, publicKeyBytes) => {
     checkSecretKey(secretKeyBytes)
@@ -281,9 +282,16 @@ const diffieHellmanSecretRawBytes = async (secretKeyBytes, publicKeyBytes) => {
     return montgomeryU(B.clearCofactor().multiply((bytesToNumberLE(h) >> 3n) % L))
 }
 
+// sha512(shared ‖ lower publicKey ‖ higher publicKey ‖ utf8(context)): binds the secret to both public keys as transmitted
+// B, -B and B + torsion give the same raw secret, but a different hash - sorted, so both sides hash the same order
+const hashSecret = (sharedSecretBytes, publicKeyBytes1, publicKeyBytes2, contextString) => {
+    const keys = tbut.bytesToHex(publicKeyBytes1) <= tbut.bytesToHex(publicKeyBytes2) ? [publicKeyBytes1, publicKeyBytes2] : [publicKeyBytes2, publicKeyBytes1]
+    return sha512Bytes(concat(concat(sharedSecretBytes, concat(...keys)), utf8(contextString)))
+}
+
 const diffieHellmanSecretHashBytes = async (secretKeyBytes, publicKeyBytes, contextString = "") => {
     const kBBytes = await diffieHellmanSecretRawBytes(secretKeyBytes, publicKeyBytes)
-    return sha512Bytes(concat(kBBytes, utf8(contextString)))
+    return hashSecret(kBBytes, await createPublicKeyBytes(secretKeyBytes), publicKeyBytes, contextString)
 }
 
 // one-time secret key n, A = publicKey(n) = referencePoint, shared secret = DH(n, B)
@@ -295,7 +303,7 @@ const elGamalSecretRawBytes = async (publicKeyBytes) => {
 
 const elGamalSecretHashBytes = async (publicKeyBytes, contextString = "") => {
     const { referencePointBytes, sharedSecretBytes } = await elGamalSecretRawBytes(publicKeyBytes)
-    return { referencePointBytes, sharedSecretBytes: await sha512Bytes(concat(sharedSecretBytes, utf8(contextString))) }
+    return { referencePointBytes, sharedSecretBytes: await hashSecret(sharedSecretBytes, referencePointBytes, publicKeyBytes, contextString) }
 }
 
 // two keys: the secret key decides the mode

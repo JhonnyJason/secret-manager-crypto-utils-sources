@@ -117,6 +117,12 @@ export const verifySignatureV0_2_0 = async (sig, key, content) => {
 
 //############################################################
 //#region diffieHellman/ElGamal secrets
+// 0.1.0 - 0.2.0: sha512(X25519 secret ‖ context) without the public keys - the raw secret is main's diffieHellmanSecretRaw
+export const diffieHellmanSecretHashV0_2_0 = async (secretKey, publicKey, contextString = "") => {
+    const kBBytes = await diffieHellmanSecretRaw(asBytes(secretKey), asBytes(publicKey))
+    return asModeOf(secretKey, await sha512Bytes(concat(kBBytes, utf8(contextString))))
+}
+
 // 0.3.0 - 0.3.1: the Edwards point k·B instead of X25519 - elGamal recovery: the receiver passes the referencePoint as publicKey
 const diffieHellmanSecretRawBytesV0_3_1 = async (secretKeyBytes, publicKeyBytes) => (await edwardsSecret(secretKeyBytes, publicKeyBytes)).toBytes()
 

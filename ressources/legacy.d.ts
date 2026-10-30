@@ -6,7 +6,7 @@ type Key = string | Uint8Array
 type LegacySecrets =
     | { referencePointHex: string, encryptedContentHex: string }
     | { referencePointBytes: Uint8Array, encryptedContentBytes: Uint8Array }
-    | { referencePoint: string, encryptedContent: string }
+    | { referencePoint: string, encryptedContent: string } // 0.0.x
 
 /** 0.0.1 – 0.2.0. No integrity check: a wrong key may return garbage - try V0_3_1 first. */
 export declare function symmetricDecryptV0_2_0(gibbrish: Key, key: Key): Promise<string>
@@ -22,6 +22,9 @@ export declare function asymmetricDecryptV0_3_1(secrets: LegacySecrets, secretKe
 
 /** 0.0.2 – 0.2.0 signed sha256(content). Resolves undefined when valid, else an error string. Never rejects. */
 export declare function verifySignatureV0_2_0(sig: Key, publicKey: Key, content: string): Promise<string | undefined>
+
+/** 0.2.0 hashed secrets: sha512(X25519 secret ‖ context), no public keys bound. The raw secret is main's diffieHellmanSecretRaw. ElGamal recovery: pass the referencePoint as publicKey. */
+export declare function diffieHellmanSecretHashV0_2_0<K extends Key>(secretKey: K, publicKey: Key, contextString?: string): Promise<K>
 
 /** 0.3.0 – 0.3.1 Edwards-point secrets. ElGamal recovery: pass the referencePoint as publicKey. */
 export declare function diffieHellmanSecretRawV0_3_1<K extends Key>(secretKey: K, publicKey: Key): Promise<K>

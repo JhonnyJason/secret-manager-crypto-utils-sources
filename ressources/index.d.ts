@@ -1,41 +1,36 @@
-// Hex: lowercase or uppercase hex string. Content: well-formed string (no lone surrogates).
+// Key: a hex string (any case) or a Uint8Array. The key decides the mode: a hex key gives hex results
+// (always lowercase), a Uint8Array key gives Uint8Array results. Other byte arguments may come in either form.
+// contentString: a well-formed string (no lone surrogates). Every function returns a Promise.
 
-export declare function sha256Hex(content: string | Uint8Array): Promise<string>
-export declare function sha512Hex(content: string | Uint8Array): Promise<string>
+export type Key = string | Uint8Array
+type Mode<K extends Key, Hex, Bytes> = K extends string ? Hex : Bytes
+
+//############################################################
+// sha*: hex output, the …Bytes variants give Uint8Array
+export declare function sha256(content: string | Uint8Array): Promise<string>
+export declare function sha512(content: string | Uint8Array): Promise<string>
 export declare function sha256Bytes(content: string | Uint8Array): Promise<Uint8Array>
 export declare function sha512Bytes(content: string | Uint8Array): Promise<Uint8Array>
-export declare const sha256: typeof sha256Hex
-export declare const sha512: typeof sha512Hex
 
 //############################################################
-export declare function createKeyPairHex(): Promise<{ secretKeyHex: string, publicKeyHex: string }>
+export declare function createKeyPair(): Promise<{ secretKeyHex: string, publicKeyHex: string }>
 export declare function createKeyPairBytes(): Promise<{ secretKeyBytes: Uint8Array, publicKeyBytes: Uint8Array }>
-export declare function createPublicKeyHex(secretKeyHex: string): Promise<string>
-export declare function createPublicKeyBytes(secretKeyBytes: Uint8Array): Promise<Uint8Array>
-export declare function createSymKeyHex(): Promise<string>
+/** 48 bytes */
+export declare function createSymKey(): Promise<string>
 export declare function createSymKeyBytes(): Promise<Uint8Array>
-export declare const createKeyPair: typeof createKeyPairHex
-export declare const createPublicKey: typeof createPublicKeyHex
-export declare const createSymKey: typeof createSymKeyHex
+export declare function createPublicKey<K extends Key>(secretKey: K): Promise<K>
 
 //############################################################
-export declare function createSignatureHex(content: string, secretKeyHex: string): Promise<string>
-export declare function createSignatureBytes(content: string, secretKeyBytes: Uint8Array): Promise<Uint8Array>
-/** Resolves undefined when the signature is valid, else an error string. Never rejects. */
-export declare function verifySignatureHex(sigHex: string, publicKeyHex: string, content: string): Promise<string | undefined>
-export declare function verifySignatureBytes(sigBytes: Uint8Array, publicKeyBytes: Uint8Array, content: string): Promise<string | undefined>
-export declare const createSignature: typeof createSignatureHex
-export declare const verifySignature: typeof verifySignatureHex
+/** Ed25519, strict RFC 8032. Note the order: content first here, signature first in verifySignature. */
+export declare function createSignature<K extends Key>(contentString: string, secretKey: K): Promise<K>
+/** Resolves undefined when the signature is valid, else an error string. Never rejects: `if (err)` means invalid. */
+export declare function verifySignature(signature: Key, publicKey: Key, contentString: string): Promise<string | undefined>
 
 //############################################################
 /** AES-256-GCM format v1. Key: >= 48 bytes. context: authenticated, not transmitted - decrypt needs the same one. */
-export declare function symmetricEncryptHex(content: string, keyHex: string, context?: string): Promise<string>
-export declare function symmetricEncryptBytes(content: string, keyBytes: Uint8Array, context?: string): Promise<Uint8Array>
+export declare function symmetricEncrypt<K extends Key>(contentString: string, key: K, context?: string): Promise<K>
 /** Reads format v1 only - older data: secret-manager-crypto-utils/legacy. Throws Error("Decryption failed!"). */
-export declare function symmetricDecryptHex(gibbrishHex: string, keyHex: string, context?: string): Promise<string>
-export declare function symmetricDecryptBytes(gibbrishBytes: Uint8Array, keyBytes: Uint8Array, context?: string): Promise<string>
-export declare const symmetricEncrypt: typeof symmetricEncryptHex
-export declare const symmetricDecrypt: typeof symmetricDecryptHex
+export declare function symmetricDecrypt(gibbrish: Key, key: Key, context?: string): Promise<string>
 
 /** PBKDF2-SHA256 -> 48 byte key. For passwords only. saltHex: >= 16 bytes, random by default. iterations: 1000..10000000. */
 export declare function deriveSymKeyFromPassword(password: string, saltHex?: string, iterations?: number): Promise<{ keyHex: string, saltHex: string, iterations: number }>
@@ -44,47 +39,19 @@ export declare function deriveSymKeyFromPassword(password: string, saltHex?: str
 export interface SecretsHex { referencePointHex: string, encryptedContentHex: string }
 export interface SecretsBytes { referencePointBytes: Uint8Array, encryptedContentBytes: Uint8Array }
 
-export declare function asymmetricEncryptHex(content: string, publicKeyHex: string, context?: string): Promise<SecretsHex>
-export declare function asymmetricEncryptBytes(content: string, publicKeyBytes: Uint8Array, context?: string): Promise<SecretsBytes>
-export declare function asymmetricDecryptHex(secrets: SecretsHex, secretKeyHex: string, context?: string): Promise<string>
-export declare function asymmetricDecryptBytes(secrets: SecretsBytes, secretKeyBytes: Uint8Array, context?: string): Promise<string>
-export declare const asymmetricEncrypt: typeof asymmetricEncryptHex
-export declare const asymmetricDecrypt: typeof asymmetricDecryptHex
+/** Not authenticated: anyone with the public key can encrypt - sign the content if the sender matters. */
+export declare function asymmetricEncrypt<K extends Key>(contentString: string, publicKey: K, context?: string): Promise<Mode<K, SecretsHex, SecretsBytes>>
+export declare function asymmetricDecrypt(secrets: SecretsHex | SecretsBytes, secretKey: Key, context?: string): Promise<string>
 
 //############################################################
-export declare function diffieHellmanSecretRawHex(secretKeyHex: string, publicKeyHex: string): Promise<string>
-export declare function diffieHellmanSecretRawBytes(secretKeyBytes: Uint8Array, publicKeyBytes: Uint8Array): Promise<Uint8Array>
-export declare function diffieHellmanSecretHashHex(secretKeyHex: string, publicKeyHex: string, contextString?: string): Promise<string>
-export declare function diffieHellmanSecretHashBytes(secretKeyBytes: Uint8Array, publicKeyBytes: Uint8Array, contextString?: string): Promise<Uint8Array>
+// two keys: the secretKey decides the mode
+/** X25519, 32 bytes. Equivalent encodings of a public key (B, -B, B + torsion) give the same raw secret. */
+export declare function diffieHellmanSecretRaw<K extends Key>(secretKey: K, publicKey: Key): Promise<K>
+/** sha512(raw ‖ lower publicKey ‖ higher publicKey ‖ utf8(contextString)), 64 bytes - binds both public keys as transmitted. */
+export declare function diffieHellmanSecretHash<K extends Key>(secretKey: K, publicKey: Key, contextString?: string): Promise<K>
 
-export declare function elGamalSecretRawHex(publicKeyHex: string): Promise<{ referencePointHex: string, sharedSecretHex: string }>
-export declare function elGamalSecretRawBytes(publicKeyBytes: Uint8Array): Promise<{ referencePointBytes: Uint8Array, sharedSecretBytes: Uint8Array }>
-export declare function elGamalSecretHashHex(publicKeyHex: string, contextString?: string): Promise<{ referencePointHex: string, sharedSecretHex: string }>
-export declare function elGamalSecretHashBytes(publicKeyBytes: Uint8Array, contextString?: string): Promise<{ referencePointBytes: Uint8Array, sharedSecretBytes: Uint8Array }>
-
-// aliases - kept for compatibility
-export declare const diffieHellmanSecretRaw: typeof diffieHellmanSecretRawHex
-export declare const createSharedSecretRaw: typeof diffieHellmanSecretRawHex
-export declare const createSharedSecretRawHex: typeof diffieHellmanSecretRawHex
-export declare const sharedSecretRawBytes: typeof diffieHellmanSecretRawBytes
-
-export declare const diffieHellmanSecretHash: typeof diffieHellmanSecretHashHex
-export declare const createSharedSecretHash: typeof diffieHellmanSecretHashHex
-export declare const createSharedSecretHashHex: typeof diffieHellmanSecretHashHex
-export declare const sharedSecretHashBytes: typeof diffieHellmanSecretHashBytes
-
-export declare const elGamalSecretRaw: typeof elGamalSecretRawHex
-export declare const referencedSharedSecretRaw: typeof elGamalSecretRawHex
-export declare const referencedSharedSecretRawHex: typeof elGamalSecretRawHex
-export declare const referencedSecretRaw: typeof elGamalSecretRawHex
-export declare const referencedSecretRawHex: typeof elGamalSecretRawHex
-export declare const referencedSharedSecretRawBytes: typeof elGamalSecretRawBytes
-export declare const referencedSecretRawBytes: typeof elGamalSecretRawBytes
-
-export declare const elGamalSecretHash: typeof elGamalSecretHashHex
-export declare const referencedSharedSecretHash: typeof elGamalSecretHashHex
-export declare const referencedSharedSecretHashHex: typeof elGamalSecretHashHex
-export declare const referencedSecretHash: typeof elGamalSecretHashHex
-export declare const referencedSecretHashHex: typeof elGamalSecretHashHex
-export declare const referencedSharedSecretHashBytes: typeof elGamalSecretHashBytes
-export declare const referencedSecretHashBytes: typeof elGamalSecretHashBytes
+export interface SharedSecretHex { referencePointHex: string, sharedSecretHex: string }
+export interface SharedSecretBytes { referencePointBytes: Uint8Array, sharedSecretBytes: Uint8Array }
+/** The receiver gets the same secret from diffieHellmanSecretRaw/Hash(secretKey, referencePoint). */
+export declare function elGamalSecretRaw<K extends Key>(publicKey: K): Promise<Mode<K, SharedSecretHex, SharedSecretBytes>>
+export declare function elGamalSecretHash<K extends Key>(publicKey: K, contextString?: string): Promise<Mode<K, SharedSecretHex, SharedSecretBytes>>
