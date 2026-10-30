@@ -9,9 +9,9 @@ const randomBytes = (n) => globalThis.crypto.getRandomValues(new Uint8Array(n))
 
 //############################################################
 //#region internalFunctions
-// thingy-byte-utils does not validate - its JS fallback would turn bad hex into garbage
+// thingy-byte-utils validates the content (SyntaxError), not the type
 const hexToBytes = (hex) => {
-    if (typeof hex != "string" || hex.length % 2 || /[^0-9a-fA-F]/.test(hex)) throw new SyntaxError("Invalid hex string!")
+    if (typeof hex != "string") throw new TypeError("Expected a hex string!")
     return tbut.hexToBytes(hex)
 }
 
@@ -25,9 +25,9 @@ const checkSymKey = (keyBytes) => {
     if (!(keyBytes?.length >= 48)) throw new RangeError("Symmetric key must have at least 48 bytes!")
 }
 
-// lone surrogates would silently become U+FFFD - what is decrypted or verified must be what went in
+// thingy-byte-utils rejects lone surrogates (TypeError), not other types
 const utf8 = (content) => {
-    if (typeof content != "string" || !content.isWellFormed()) throw new TypeError("Content must be a well-formed string!")
+    if (typeof content != "string") throw new TypeError("Content must be a string!")
     return tbut.utf8ToBytes(content)
 }
 

@@ -35,7 +35,7 @@
     "homepage": "https://github.com/JhonnyJason/secret-manager-crypto-utils-output#readme",
     "dependencies": {
         "@noble/ed25519": "^3.2.0",
-        "thingy-byte-utils": "^0.1.0"
+        "thingy-byte-utils": "^0.2.0"
     },
     "type": "module",
     "engines": {
